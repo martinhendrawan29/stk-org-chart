@@ -178,6 +178,9 @@
                 <button id="pasteNodeBtn" title="Paste Personil (Cmd+V)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <i data-lucide="clipboard-paste" class="w-3.5 h-3.5 text-slate-600"></i> Paste
                 </button>
+                <button id="connectModeBtn" title="Ubah Relasi Pelaporan / Atasan" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <i data-lucide="git-fork" class="w-3.5 h-3.5 text-indigo-600"></i> Ubah Atasan
+                </button>
                 <button id="addNodeBtn" title="Tambah Personil Baru" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <i data-lucide="user-plus" class="w-3.5 h-3.5 text-indigo-600"></i> Tambah Node
                 </button>
@@ -345,11 +348,26 @@
             }
         }
 
-        // Copy - Paste Functionality
         function copySelectedNodes() {
             if (selectedNodeIds.size === 0) return;
             clipboardNodes = orgData.filter(d => selectedNodeIds.has(d.id)).map(d => JSON.parse(JSON.stringify(d)));
-            alert(`${clipboardNodes.length} personil berhasil disalin!`);
+        }
+
+        function deleteSelectedNodes() {
+            if (selectedNodeIds.size === 0) return;
+            saveStateToHistory();
+            selectedNodeIds.forEach(id => {
+                const nodeToDelete = orgData.find(d => d.id === id);
+                if (nodeToDelete) {
+                    orgData.forEach(d => {
+                        if (d.parent === id) d.parent = nodeToDelete.parent;
+                    });
+                }
+            });
+            orgData = orgData.filter(d => !selectedNodeIds.has(d.id));
+            selectedNodeIds.clear();
+            renderNodes();
+            autoSaveToLocalStorage();
         }
 
         function pasteNodes() {
@@ -420,10 +438,10 @@
 
                 node.innerHTML = `
                     <div class="node-actions">
-                        <button onclick="copySingleNode('${item.id}')" title="Copy" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                        <button onclick="copySingleNode(event, '${item.id}')" title="Copy" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
                             <i data-lucide="copy" class="w-3 h-3"></i>
                         </button>
-                        <button onclick="openEditModal('${item.id}')" title="Edit" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                        <button onclick="openEditModalDirect(event, '${item.id}')" title="Edit" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
                             <i data-lucide="pencil" class="w-3 h-3"></i>
                         </button>
                     </div>
@@ -444,10 +462,53 @@
             updateConnectors();
         }
 
-        function copySingleNode(id) {
+        function copySingleNode(e, id) {
+            e.stopPropagation();
             selectedNodeIds.clear();
             selectedNodeIds.add(id);
             copySelectedNodes();
+        }
+
+        function openEditModalDirect(e, id) {
+            e.stopPropagation();
+            openEditModal(id);
+        }
+
+        function openEditModal(nodeId = null) {
+            const modal = document.getElementById('nodeModal');
+            const parentSelect = document.getElementById('modalParentSelect');
+            if (!modal || !parentSelect) return;
+
+            parentSelect.innerHTML = '<option value="">-- Tidak Ada (Top Level / C-Level) --</option>';
+            orgData.forEach(d => {
+                if (d.id !== nodeId) {
+                    parentSelect.innerHTML += `<option value="${d.id}">${d.name} (${d.title})</option>`;
+                }
+            });
+
+            if (nodeId) {
+                const item = orgData.find(d => d.id === nodeId);
+                document.getElementById('modalTitle').innerText = 'Edit Data Personil';
+                document.getElementById('modalNodeId').value = item.id;
+                document.getElementById('modalName').value = item.name;
+                document.getElementById('modalParentSelect').value = item.parent || '';
+                document.getElementById('modalTypeSelect').value = item.type || 'staff';
+                document.getElementById('deleteNodeBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('modalTitle').innerText = 'Tambah Personil Baru';
+                document.getElementById('modalNodeId').value = '';
+                document.getElementById('modalName').value = '';
+                document.getElementById('modalParentSelect').value = '';
+                document.getElementById('modalTypeSelect').value = 'junior_staff';
+                document.getElementById('deleteNodeBtn').classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('nodeModal');
+            if (modal) modal.classList.add('hidden');
         }
 
         function generateConnectorsSvgString(offsetX = 0, offsetY = 0, markerId = 'arrow') {
@@ -581,41 +642,6 @@
             });
         }
 
-        // Export & Import JSON Dataset
-        function exportDatasetJson() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(orgData, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "STK_Org_Chart_Data.json");
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
-
-        function importDatasetJson(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                try {
-                    const importedData = JSON.parse(evt.target.result);
-                    if (Array.isArray(importedData)) {
-                        saveStateToHistory();
-                        orgData = importedData;
-                        renderNodes();
-                        autoSaveToLocalStorage();
-                        alert("Dataset berhasil diimpor!");
-                    } else {
-                        alert("Format JSON tidak valid.");
-                    }
-                } catch (err) {
-                    alert("Gagal membaca file JSON.");
-                }
-            };
-            reader.readAsText(file);
-        }
-
         function initApp() {
             viewport = document.getElementById('viewport');
             transformer = document.getElementById('chartTransformer');
@@ -628,15 +654,19 @@
             window.addEventListener('keydown', (e) => {
                 const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
                 const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+                const activeEl = document.activeElement;
+                const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
 
-                if (cmdKey && e.key.toLowerCase() === 'c') {
+                if (cmdKey && e.key.toLowerCase() === 'c' && !isTyping) {
                     copySelectedNodes();
-                } else if (cmdKey && e.key.toLowerCase() === 'v') {
+                } else if (cmdKey && e.key.toLowerCase() === 'v' && !isTyping) {
                     pasteNodes();
                 } else if (cmdKey && e.shiftKey && e.key.toLowerCase() === 'z') {
                     e.preventDefault(); redo();
                 } else if (cmdKey && e.key.toLowerCase() === 'z') {
                     e.preventDefault(); undo();
+                } else if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) {
+                    deleteSelectedNodes();
                 }
             });
 
@@ -644,9 +674,9 @@
             document.getElementById('pasteNodeBtn').addEventListener('click', pasteNodes);
             document.getElementById('undoBtn').addEventListener('click', undo);
             document.getElementById('redoBtn').addEventListener('click', redo);
-            document.getElementById('exportJsonBtn').addEventListener('click', exportDatasetJson);
-            document.getElementById('importJsonBtn').addEventListener('click', () => document.getElementById('jsonFileInput').click());
-            document.getElementById('jsonFileInput').addEventListener('change', importDatasetJson);
+            document.getElementById('addNodeBtn').addEventListener('click', () => openEditModal(null));
+            document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+            document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
 
             renderNodes();
             updateTransform();
