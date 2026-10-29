@@ -4,1369 +4,880 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STK Organization Chart</title>
-    <!-- Tailwind CSS CDN -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Font Family Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
-            user-select: none;
-            overflow: hidden;
-        }
-
-        /* Viewport Container */
-        #viewport {
-            width: 100vw;
-            height: calc(100vh - 61px);
-            position: relative;
-            overflow: hidden;
-            cursor: grab;
-            background-color: #f8fafc;
-        }
-
-        #viewport.grabbing {
-            cursor: grabbing;
-        }
-
-        /* Pan & Zoom Transformer Layer */
-        #chartTransformer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            transform-origin: 0 0;
-            will-change: transform;
-        }
-
-        /* Interactive Canvas Grid */
-        #chartArea {
-            position: relative;
-            width: 4500px;
-            height: 2500px;
-            background-color: #f8fafc;
-            background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+        .canvas-bg {
+            background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
             background-size: 24px 24px;
         }
-
-        /* Level Swimlanes */
-        .swimlane {
-            position: absolute;
-            left: 0;
-            width: 100%;
-            border-bottom: 2px dashed #cbd5e1;
-            pointer-events: none;
-            display: flex;
-            align-items: flex-start;
-            z-index: 1;
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .node-card {
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
         }
-
-        .swimlane-label {
-            position: sticky;
-            left: 20px;
-            top: 10px;
-            padding: 4px 12px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            z-index: 5;
-            pointer-events: auto;
-        }
-
-        /* SVG Overlay for Connectors */
-        #svgConnectors {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 2;
-        }
-
-        /* Uniform Node Styling */
-        .org-node {
-            position: absolute;
-            width: 210px;
-            height: 64px;
-            background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
-            padding: 6px 10px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            cursor: move;
-            z-index: 10;
-            transition: border-color 0.15s, box-shadow 0.15s;
-        }
-
-        .org-node:hover {
-            border-color: #6366f1;
-            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.2);
-        }
-
-        .org-node.dragging {
-            z-index: 50;
-            opacity: 0.95;
-            border-color: #4f46e5;
-            box-shadow: 0 15px 25px -5px rgba(79, 70, 229, 0.3);
-            transition: none !important;
-        }
-
-        .org-node.selected-child {
-            outline: 3px solid #ef4444 !important;
-            border-color: #ef4444;
-        }
-
-        .org-node.multi-selected {
-            border-color: #6366f1 !important;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4) !important;
-            background-color: #f0fdf4;
-        }
-
-        .org-node.target-parent {
-            outline: 3px dashed #10b981 !important;
-            animation: pulse-border 1s infinite;
-        }
-
-        /* Selection Box Overlay */
-        #selectionBox {
-            position: absolute;
-            border: 1.5px dashed #6366f1;
-            background-color: rgba(99, 102, 241, 0.12);
-            pointer-events: none;
-            z-index: 100;
-            display: none;
-            border-radius: 4px;
-        }
-
-        @keyframes pulse-border {
-            0%, 100% { border-color: #10b981; }
-            50% { border-color: #059669; }
-        }
-
-        /* Visual Department Themes */
-        .node-bod {
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            color: #ffffff;
-            border-color: #334155;
-        }
-        .node-bod .node-title { color: #94a3b8; }
-
-        .node-manager { border-left: 5px solid #8b5cf6; }
-        .node-pm { border-left: 5px solid #f59e0b; }
-        .node-sm { border-left: 5px solid #10b981; }
-        .node-staff { border-left: 5px solid #3b82f6; }
-        .node-vacant {
-            border: 1.5px dashed #f59e0b;
-            background-color: #fffbe8;
-        }
-
-        .highlight-search {
-            outline: 3px solid #6366f1 !important;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.04); }
-        }
-
-        /* Action Buttons on Node Hover */
-        .node-actions {
-            display: none;
-            position: absolute;
-            top: -12px;
-            right: 8px;
-            gap: 4px;
-            z-index: 20;
-        }
-
-        .org-node:hover .node-actions {
-            display: flex;
+        .node-card:hover {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-800">
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden select-none">
 
-    <!-- HEADER / TOOLBAR -->
-    <header class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap justify-between items-center z-30 shadow-sm gap-4">
+    <!-- Top Toolbar -->
+    <header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between z-30 shadow-sm flex-wrap gap-3">
         <div class="flex items-center space-x-3">
-            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow">
-                <i data-lucide="network" class="w-6 h-6"></i>
+            <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-md">
+                <i data-lucide="git-fork" class="w-5 h-5"></i>
             </div>
             <div>
-                <div class="flex items-center gap-2">
-                    <h1 class="font-bold text-lg text-slate-900 tracking-tight leading-none">STK Organization Chart</h1>
-                    <span id="saveStatus" class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <i data-lucide="check" class="w-3 h-3"></i> Tersimpan
-                    </span>
-                </div>
-                <p class="text-xs text-slate-500 font-medium mt-0.5">Bagan Struktur Organisasi - Auto-Snap Levels & High-Res Export</p>
+                <h1 class="font-bold text-slate-900 text-lg leading-tight">STK Organization Chart</h1>
+                <p class="text-xs text-slate-500" id="last-update-text">Terakhir diperbarui: Baru saja</p>
             </div>
         </div>
 
-        <!-- Mode Indicator / Banner -->
-        <div id="connectBanner" class="hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 animate-pulse">
-            <i data-lucide="link" class="w-4 h-4"></i>
-            <span id="connectBannerText">Langkah 1: Klik Kotak Bawahan (Child Node)</span>
-            <button id="cancelConnectBtn" class="text-amber-900 underline hover:text-black ml-2 text-[11px]">Batal</button>
-        </div>
-
-        <div class="flex items-center flex-wrap gap-3">
+        <div class="flex items-center space-x-2 flex-wrap gap-2">
             <!-- Search -->
-            <div class="relative w-44">
-                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                <input type="text" id="searchInput" placeholder="Cari nama / posisi..." 
-                    class="w-full pl-9 pr-3 py-1.5 bg-slate-100 text-slate-800 text-xs rounded-lg border border-slate-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition">
+            <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="search-input" placeholder="Cari nama / posisi..." class="pl-9 pr-4 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white w-48 sm:w-64">
             </div>
+
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+            <!-- History Actions -->
+            <button onclick="undoAction()" title="Undo (Cmd+Z)" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition flex items-center space-x-1 text-sm font-medium">
+                <i data-lucide="undo-2" class="w-4 h-4"></i>
+                <span class="hidden md:inline">Undo</span>
+            </button>
+            <button onclick="redoAction()" title="Redo (Cmd+Shift+Z)" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition flex items-center space-x-1 text-sm font-medium">
+                <i data-lucide="redo-2" class="w-4 h-4"></i>
+                <span class="hidden md:inline">Redo</span>
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+            <!-- Add Node -->
+            <button onclick="openAddModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span>Tambah Personil</span>
+            </button>
 
             <!-- Zoom Controls -->
-            <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
-                <button id="zoomOutBtn" title="Zoom Out (-)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
-                    <i data-lucide="zoom-out" class="w-4 h-4"></i>
-                </button>
-                <span id="zoomLevelText" class="px-2 text-slate-600 min-w-[45px] text-center">100%</span>
-                <button id="zoomInBtn" title="Zoom In (+)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
-                    <i data-lucide="zoom-in" class="w-4 h-4"></i>
-                </button>
-                <button id="resetViewBtn" title="Reset Pandangan / Center" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm ml-1 border-l border-slate-200">
-                    <i data-lucide="maximize-2" class="w-4 h-4"></i>
-                </button>
+            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+                <button onclick="zoomOut()" title="Zoom Out" class="p-1.5 hover:bg-slate-200 rounded text-slate-600"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+                <span id="zoom-level-label" class="px-2 text-xs font-semibold text-slate-600 w-12 text-center">100%</span>
+                <button onclick="zoomIn()" title="Zoom In" class="p-1.5 hover:bg-slate-200 rounded text-slate-600"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+                <button onclick="resetZoom()" title="Reset Zoom" class="p-1.5 hover:bg-slate-200 rounded text-slate-600 border-l border-slate-200"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
             </div>
 
-            <!-- Toolbar Controls -->
-            <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
-                <button id="undoBtn" title="Undo Langkah (Cmd+Z / Ctrl+Z)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="undo-2" class="w-3.5 h-3.5 text-slate-600"></i> Undo
-                </button>
-                <button id="redoBtn" title="Redo Langkah (Cmd+Shift+Z / Ctrl+Y)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="redo-2" class="w-3.5 h-3.5 text-slate-600"></i> Redo
-                </button>
-                <button id="saveManualBtn" title="Simpan Perubahan (Cmd+S / Ctrl+S)" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="save" class="w-3.5 h-3.5"></i> Simpan (Cmd+S)
-                </button>
-                <button id="connectModeBtn" title="Ubah Relasi Pelaporan / Konektor" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="git-fork" class="w-3.5 h-3.5 text-indigo-600"></i> Ubah Atasan
-                </button>
-                <button id="addNodeBtn" title="Tambah Personil Baru" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="user-plus" class="w-3.5 h-3.5 text-indigo-600"></i> Tambah Node
-                </button>
-                <button id="resetLayoutBtn" title="Reset ke Default Awal" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-slate-600"></i> Reset Default
-                </button>
-                <button id="exportPngBtn" title="Unduh Gambar PNG" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Export PNG
-                </button>
-            </div>
+            <!-- Export PNG -->
+            <button onclick="exportToPNG()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Export PNG</span>
+            </button>
         </div>
     </header>
 
-    <!-- MAIN VIEWPORT CANVAS WITH TRANSFORMER -->
-    <main id="viewport">
-        <div id="chartTransformer">
-            <div id="chartArea">
-                <!-- Swimlanes Background -->
-                <div id="swimlanesContainer"></div>
-
-                <!-- SVG Connectors Canvas -->
-                <svg id="svgConnectors">
-                    <defs>
-                        <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
-                        </marker>
-                    </defs>
-                </svg>
-
-                <!-- Area Selection Box -->
-                <div id="selectionBox"></div>
-
-                <!-- NODES CONTAINER -->
-                <div id="nodesContainer"></div>
+    <!-- Main Canvas Viewport -->
+    <main id="viewport" class="flex-1 relative overflow-hidden canvas-bg cursor-grab active:cursor-grabbing">
+        <div id="canvas" class="absolute top-0 left-0 w-[4500px] h-[3200px] origin-top-left transition-transform duration-75">
+            <!-- Swimlane Level Backgrounds & Headers -->
+            <div id="swimlanes-container" class="absolute inset-0 pointer-events-none z-0">
+                <!-- Level BOD -->
+                <div class="absolute left-0 right-0 top-[100px] h-[350px] border-b border-slate-300/60 bg-slate-200/20 flex items-start px-8 pt-4">
+                    <span class="bg-slate-900 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded shadow">Level BOD</span>
+                </div>
+                <!-- Level Manager -->
+                <div class="absolute left-0 right-0 top-[480px] h-[450px] border-b border-slate-300/60 bg-indigo-500/5 flex items-start px-8 pt-4">
+                    <span class="bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded shadow">Level Manager</span>
+                </div>
+                <!-- Level Senior Staff -->
+                <div class="absolute left-0 right-0 top-[960px] h-[550px] border-b border-slate-300/60 bg-blue-500/5 flex items-start px-8 pt-4">
+                    <span class="bg-blue-600 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded shadow">Level Senior Staff</span>
+                </div>
+                <!-- Level Junior Staff -->
+                <div class="absolute left-0 right-0 top-[1540px] h-[600px] border-b border-slate-300/60 bg-emerald-500/5 flex items-start px-8 pt-4">
+                    <span class="bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded shadow">Level Junior Staff</span>
+                </div>
+                <!-- Level Probation -->
+                <div class="absolute left-0 right-0 top-[2170px] h-[700px] border-b border-slate-300/60 bg-amber-500/5 flex items-start px-8 pt-4">
+                    <span class="bg-amber-600 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded shadow">Level Probation</span>
+                </div>
             </div>
+
+            <!-- SVG Connector Lines Container -->
+            <svg id="connections-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+
+            <!-- Nodes Container -->
+            <div id="nodes-container" class="absolute inset-0 z-20 pointer-events-none"></div>
+        </div>
+
+        <!-- Floating Info / Instructions -->
+        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur border border-slate-200 p-3 rounded-xl shadow-lg text-xs text-slate-600 space-y-1 z-30 pointer-events-auto">
+            <p class="font-semibold text-slate-800 flex items-center space-x-1"><i data-lucide="info" class="w-3.5 h-3.5 text-indigo-600"></i><span>Panduan Cepat:</span></p>
+            <p>• **Geser Kotak**: Drag & Drop (Otomatis magnet ke garis tengah swimlane level).</p>
+            <p>• **Multi-Select**: Tahan Shift + Klik atau Drag area kosong untuk pilih banyak kotak.</p>
+            <p>• **Edit / Hapus**: Klik dua kali (double click) atau ikon edit pada kotak.</p>
+            <p>• **Shortcut**: <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">Cmd+Z</code> (Undo) | <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">Cmd+Shift+Z</code> (Redo)</p>
         </div>
     </main>
 
-    <!-- EDIT / ADD NODE MODAL -->
-    <div id="nodeModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
-            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                <h3 id="modalTitle" class="font-bold text-slate-800 text-sm">Edit Data Personil</h3>
-                <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+    <!-- Modal Form (Tambah / Edit Personil) -->
+    <div id="person-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-150">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 id="modal-title" class="font-bold text-slate-900 text-base">Tambah Personil Baru</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <form id="nodeForm" class="p-6 space-y-4">
-                <input type="hidden" id="modalNodeId">
+            <form id="person-form" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="edit-node-id">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Lengkap</label>
-                    <input type="text" id="modalName" required placeholder="Contoh: Budi Setiawan" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 capitalize">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Nama Lengkap</label>
+                    <input type="text" id="input-name" required placeholder="Contoh: Budi Setiawan" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white" oninput="autoFormatName(this)">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Jabatan / Posisi</label>
-                    <select id="modalTitleSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
-                        <!-- Populated dynamically -->
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Jabatan / Posisi</label>
+                    <select id="input-position-select" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white mb-2" onchange="handlePositionSelectChange(this)">
+                        <!-- Dynamically filled -->
                     </select>
-                    <input type="text" id="modalCustomTitleInput" placeholder="Ketik nama posisi baru..." class="w-full px-3 py-2 mt-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 hidden">
+                    <input type="text" id="input-position-custom" placeholder="Ketik posisi baru..." class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white hidden">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Atasan Direct (Report To)</label>
-                    <select id="modalParentSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Atasan Direct (Report To)</label>
+                    <select id="input-manager" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
                         <option value="">-- Tidak Ada (Top Level / C-Level) --</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Tipe Level Area</label>
-                    <select id="modalTypeSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Tipe Level / Swimlane</label>
+                    <select id="input-level" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
                         <option value="bod">Level BOD</option>
                         <option value="manager">Level Manager</option>
-                        <option value="senior_staff">Level Senior Staff</option>
-                        <option value="junior_staff">Level Junior Staff</option>
+                        <option value="senior">Level Senior Staff</option>
+                        <option value="junior">Level Junior Staff</option>
                         <option value="probation">Level Probation</option>
                     </select>
                 </div>
-                <div class="pt-2 flex justify-between items-center gap-2">
-                    <button type="button" id="deleteNodeBtn" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Node
-                    </button>
-                    <div class="flex gap-2">
-                        <button type="button" id="cancelModalBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">Batal</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow">Simpan</button>
-                    </div>
+                <div class="pt-3 flex items-center justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">Batal</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition">Simpan</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Application Script -->
     <script>
-        if (window.lucide) lucide.createIcons();
+        // Initial dataset reflecting the correct organizational structure
+        const initialNodes = [
+            // BOD
+            { id: "erwin", name: "Erwin Suryawangi", position: "CEO", manager: "", level: "bod", x: 600, y: 160, color: "slate" },
+            { id: "ivan", name: "Ivan Sutanto", position: "CFO", manager: "", level: "bod", x: 1300, y: 160, color: "slate" },
+            { id: "budi", name: "Budi Setiawan", position: "COO", manager: "", level: "bod", x: 2300, y: 160, color: "slate" },
 
-        // LocalStorage Key
-        const STORAGE_KEY = 'STK_ORG_CHART_DATA_V2';
-
-        // Swimlane Heights & Centers Definition
-        const LEVEL_ZONES = [
-            { id: "bod", name: "LEVEL BOD", top: 40, height: 180, centerY: 100, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0f172a", labelColor: "#ffffff" },
-            { id: "manager", name: "LEVEL MANAGER", top: 220, height: 200, centerY: 290, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#8b5cf6", labelColor: "#ffffff" },
-            { id: "senior_staff", name: "LEVEL SENIOR STAFF", top: 420, height: 200, centerY: 490, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0284c7", labelColor: "#ffffff" },
-            { id: "junior_staff", name: "LEVEL JUNIOR STAFF", top: 620, height: 200, centerY: 690, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#10b981", labelColor: "#ffffff" },
-            { id: "probation", name: "LEVEL PROBATION", top: 820, height: 200, centerY: 890, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#64748b", labelColor: "#ffffff" }
-        ];
-
-        // Initial Organogram Data Structure aligned with Swimlane Center Y-values
-        const defaultOrgData = [
-            // C-LEVEL (BOD)
-            { id: "ceo", name: "Erwin Suryawangi", title: "CEO", parent: null, type: "bod", x: 320, y: 100 },
-            { id: "cfo", name: "Ivan Sutanto", title: "CFO", parent: null, type: "bod", x: 920, y: 100 },
-            { id: "coo", name: "Budi Setiawan", title: "COO", parent: null, type: "bod", x: 1720, y: 100 },
-
-            // UNDER CEO (ERWIN)
-            { id: "sales_mgr", name: "Martin Hendrawan", title: "Sales & Marketing Manager", parent: "ceo", type: "manager", x: 320, y: 290 },
-            { id: "csm_spec", name: "Lahana Nirwanda Artami", title: "Community & Social Media Spec.", parent: "sales_mgr", type: "staff", x: 320, y: 490 },
-
-            // UNDER CFO (IVAN)
-            { id: "fin_mgr", name: "Siti Romlah", title: "Finance Manager", parent: "cfo", type: "manager", x: 670, y: 290 },
-            { id: "hr_mgr", name: "Dewi Ariyani", title: "HRGA Manager", parent: "cfo", type: "manager", x: 1170, y: 290 },
-            { id: "qs_vacant", name: "QS (Vacant)", title: "Quantity Surveyor", parent: "cfo", type: "vacant", x: 1420, y: 490 },
-            { id: "estimator_staff", name: "Indah Fitria Rahami", title: "Estimator Staff", parent: "cfo", type: "staff", x: 1670, y: 490 },
-
-            // UNDER FINANCE MGR (SITI ROMLAH)
-            { id: "fin_staff", name: "Rahma Virani Lintang Utomo", title: "Finance & Acct Staff", parent: "fin_mgr", type: "staff", x: 550, y: 490 },
-            { id: "sr_purchasing", name: "Putri Natasya", title: "Senior Purchasing", parent: "fin_mgr", type: "staff", x: 800, y: 490 },
+            // Level Manager (Under Erwin)
+            { id: "martin", name: "Martin Hendrawan", position: "Sales & Marketing Manager", manager: "erwin", level: "manager", x: 300, y: 560, color: "indigo" },
             
-            // UNDER SR PURCHASING (PUTRI NATASYA)
-            { id: "purchasing_staff", name: "Siti Mayrina Nurazizah", title: "Purchasing Staff", parent: "sr_purchasing", type: "staff", x: 800, y: 690 },
+            // Level Manager (Under Ivan)
+            { id: "siti_romlah", name: "Siti Romlah", position: "Finance Manager", manager: "ivan", level: "manager", x: 1050, y: 560, color: "indigo" },
+            { id: "dewi", name: "Dewi Ariyani", position: "HRGA Manager", manager: "ivan", level: "manager", x: 1500, y: 560, color: "indigo" },
 
-            // UNDER COO (BUDI) - TIM 1 (ARIF)
-            { id: "pm_arif", name: "Arif Saifurrochim", title: "Project Manager", parent: "coo", type: "pm", x: 2000, y: 290 },
-            { id: "sm_helmy", name: "Helmy Setiawan", title: "Site Manager", parent: "pm_arif", type: "sm", x: 1900, y: 490 },
-            { id: "sm_imam", name: "Imam Yuddi P", title: "Site Manager", parent: "pm_arif", type: "sm", x: 1900, y: 690 },
-            { id: "pc_khoirus", name: "Khoirus Syahira", title: "Project Coordinator", parent: "pm_arif", type: "staff", x: 1900, y: 890 },
-            { id: "log_zulkifli", name: "Zulkifli", title: "Logistic Staff", parent: "pc_khoirus", type: "staff", x: 1770, y: 1090 },
-            { id: "log_yasin", name: "Yasin Muchamad Ilham", title: "Logistic Staff", parent: "pc_khoirus", type: "staff", x: 2010, y: 1090 },
+            // Level Senior Staff (Under Erwin / Martin)
+            { id: "lahana", name: "Lahana Nirwanda Artami", position: "Community & Social Media Specialist", manager: "martin", level: "senior", x: 300, y: 1060, color: "blue" },
 
-            // UNDER COO - TIM 2 (REZA)
-            { id: "pm_reza", name: "Muhammad Reza Pahlevi H.", title: "Project Manager", parent: "coo", type: "pm", x: 2300, y: 290 },
-            { id: "sm_trias", name: "Trias Kusuma Nugraha", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2300, y: 490 },
-            { id: "sm_barkah", name: "Barkah Tri Abdi", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2300, y: 690 },
-            { id: "sm_denny", name: "Denny Fitrianto Saidi", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2300, y: 890 },
-            { id: "pc_ayufy", name: "Ayufy Riska Helmida", title: "Project Coordinator", parent: "pm_reza", type: "staff", x: 2300, y: 1090 },
-            { id: "log_tri", name: "Tri Aditya Setiawan", title: "Logistic Staff", parent: "pc_ayufy", type: "staff", x: 2300, y: 1290 },
+            // Level Senior Staff (Under Ivan / Siti Romlah)
+            { id: "rahma", name: "Rahma Virani Lintang Utomo", position: "Finance & Acct Staff", manager: "siti_romlah", level: "senior", x: 900, y: 1060, color: "blue" },
+            { id: "putri", name: "Putri Natasya", position: "Senior Purchasing", manager: "siti_romlah", level: "senior", x: 1200, y: 1060, color: "blue" },
 
-            // UNDER COO - TIM 3 (TONI)
-            { id: "pm_toni", name: "Toni Oki Pratama", title: "Jr Project Manager", parent: "coo", type: "pm", x: 2600, y: 290 },
-            { id: "sm_idris", name: "Idris Albawavi", title: "Site Manager", parent: "pm_toni", type: "sm", x: 2600, y: 490 },
-            { id: "sm_ismawan", name: "Ismawan Adhi Ramadhan", title: "Site Manager", parent: "pm_toni", type: "sm", x: 2600, y: 690 },
-            { id: "pc_rahma", name: "Rahma Dwi Nur Hijriah", title: "Project Coordinator", parent: "pm_toni", type: "staff", x: 2600, y: 890 },
-            { id: "log_hanif", name: "Muhammad Hanif", title: "Logistic Staff", parent: "pc_rahma", type: "staff", x: 2600, y: 1090 },
+            // Level Senior Staff (Under Ivan Directly - QS & Estimator)
+            { id: "qs", name: "QS (Vacant)", position: "Quantity Surveyor", manager: "ivan", level: "senior", x: 1550, y: 1060, color: "amber" },
+            { id: "indah", name: "Indah Fitria Rahami", position: "Estimator Staff", manager: "ivan", level: "senior", x: 1900, y: 1060, color: "blue" },
 
-            // UNDER COO - TIM 4 (TOPO)
-            { id: "pm_sutopo", name: "Sutopo", title: "Senior Site Manager", parent: "coo", type: "pm", x: 2900, y: 290 },
-            { id: "sm_reza_a", name: "Reza Afrilianto", title: "Site Manager", parent: "pm_sutopo", type: "sm", x: 2900, y: 490 },
-            { id: "pc_anik", name: "Anik Purmiati", title: "Project Coordinator", parent: "pm_sutopo", type: "staff", x: 2900, y: 690 },
-            { id: "log_ian", name: "Ian Setiawan", title: "Logistic Staff", parent: "sm_reza_a", type: "staff", x: 2900, y: 890 }
+            // Level Junior Staff (Under Putri Natasya)
+            { id: "siti_mayrina", name: "Siti Mayrina Nurazizah", position: "Purchasing Staff", manager: "putri", level: "junior", x: 1200, y: 1640, color: "emerald" },
+
+            // 4 Operational Teams under Budi Setiawan (Managers)
+            { id: "arif", name: "Arif Saifurrachim", position: "Project Manager", manager: "budi", level: "manager", x: 2100, y: 560, color: "amber" },
+            { id: "reza", name: "Muhammad Reza Pahlevi H.", position: "Project Manager", manager: "budi", level: "manager", x: 2750, y: 560, color: "amber" },
+            { id: "toni", name: "Toni Oki Pratama", position: "Jr Project Manager", manager: "budi", level: "manager", x: 3350, y: 560, color: "amber" },
+            { id: "sutopo", name: "Sutopo", position: "Senior Site Manager", manager: "budi", level: "manager", x: 3900, y: 560, color: "amber" },
+
+            // Team Arif (Level Senior)
+            { id: "helmy", name: "Helmy Setiawan", position: "Site Manager", manager: "arif", level: "senior", x: 2000, y: 1060, color: "emerald" },
+            { id: "imam", name: "Imam Yuddi P", position: "Site Manager", manager: "arif", level: "senior", x: 2250, y: 1060, color: "emerald" },
+            // Team Arif Level Junior & Probation
+            { id: "khoirus", name: "Khoirus Syahira", position: "Project Coordinator", manager: "imam", level: "junior", x: 2250, y: 1640, color: "blue" },
+            { id: "zulkifli", name: "Zulkifli", position: "Logistic Staff", manager: "khoirus", level: "probation", x: 2150, y: 2240, color: "blue" },
+            { id: "yasin", name: "Yasin Muchamad Ilham", position: "Logistic Staff", manager: "khoirus", level: "probation", x: 2350, y: 2240, color: "blue" },
+
+            // Team Reza (Level Senior)
+            { id: "trias", name: "Trias Kusuma Nugraha", position: "Site Manager", manager: "reza", level: "senior", x: 2600, y: 1060, color: "emerald" },
+            { id: "barkah", name: "Tri Abdi", position: "Site Manager", manager: "reza", level: "senior", x: 2800, y: 1060, color: "emerald" },
+            { id: "denny", name: "Denny Fitrianto Saidi", position: "Site Manager", manager: "reza", level: "senior", x: 3000, y: 1060, color: "emerald" },
+            // Team Reza Level Junior & Probation
+            { id: "ayufy", name: "Ayufy Riska Helmida", position: "Project Coordinator", manager: "denny", level: "junior", x: 3000, y: 1640, color: "blue" },
+            { id: "tri_aditya", name: "Tri Aditya Setiawan", position: "Logistic Staff", manager: "ayufy", level: "probation", x: 2850, y: 2240, color: "blue" },
+            { id: "agung", name: "Agung Satryo Leksono", position: "Logistic Staff", manager: "ayufy", level: "probation", x: 3000, y: 2240, color: "blue" },
+            { id: "tomy", name: "Tomy Rizki Gumilar", position: "Logistic Staff", manager: "ayufy", level: "probation", x: 3150, y: 2240, color: "blue" },
+            { id: "andre", name: "Andre Septiyan", position: "Drafter", manager: "tomy", level: "probation", x: 3150, y: 2750, color: "emerald" },
+
+            // Team Toni (Level Senior)
+            { id: "idris", name: "Idris Albawavi", position: "Site Manager", manager: "toni", level: "senior", x: 3300, y: 1060, color: "emerald" },
+            { id: "ismawan", name: "Ismawan Adhi Ramadhan", position: "Site Manager", manager: "toni", level: "senior", x: 3500, y: 1060, color: "emerald" },
+            // Team Toni Level Junior & Probation
+            { id: "rahma_dwi", name: "Rahma Dwi Nur Hijriah", position: "Project Coordinator", manager: "ismawan", level: "junior", x: 3500, y: 1640, color: "blue" },
+            { id: "muh_hanif", name: "Muhammad Hanif", position: "Logistic Staff", manager: "ismawan", level: "probation", x: 3500, y: 2240, color: "blue" },
+
+            // Team Sutopo (Level Senior)
+            { id: "reza_afr", name: "Reza Afrilianto", position: "Site Manager", manager: "sutopo", level: "senior", x: 3800, y: 1060, color: "emerald" },
+            { id: "anik", name: "Anik Purmiati", position: "Project Coordinator", manager: "sutopo", level: "senior", x: 4050, y: 1060, color: "blue" },
+            // Team Sutopo Level Junior & Probation
+            { id: "ian", name: "Ian Setiawan", position: "Logistic Staff", manager: "reza_afr", level: "junior", x: 3800, y: 1640, color: "blue" }
         ];
 
-        // Load data from LocalStorage or Fallback
-        function loadSavedData() {
-            try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) return JSON.parse(saved);
-            } catch (e) {
-                console.error("Gagal memuat dari local storage", e);
-            }
-            return JSON.parse(JSON.stringify(defaultOrgData));
-        }
-
-        let orgData = loadSavedData();
-        let hasUnsavedChanges = false;
-
-        // Undo & Redo History Stack
+        // State Management
+        let nodes = JSON.parse(localStorage.getItem('stk_nodes_v4')) || initialNodes;
         let historyStack = [];
         let redoStack = [];
-        const MAX_HISTORY = 30;
 
-        function saveStateToHistory() {
-            historyStack.push(JSON.stringify(orgData));
-            redoStack = []; // Clear redo stack on new action
-            if (historyStack.length > MAX_HISTORY) {
-                historyStack.shift();
-            }
-            markUnsaved();
-        }
+        // Level Y Snap Centers
+        const levelYMap = {
+            bod: 160,
+            manager: 560,
+            senior: 1060,
+            junior: 1640,
+            probation: 2240
+        };
 
-        function undo() {
-            if (historyStack.length > 0) {
-                redoStack.push(JSON.stringify(orgData));
-                const previousState = historyStack.pop();
-                orgData = JSON.parse(previousState);
-                renderNodes();
-                autoSaveToLocalStorage();
-            }
-        }
+        // Canvas Zoom & Pan State
+        let scale = 0.55;
+        let panX = 400;
+        let panY = 100;
+        let isPanning = false;
+        let startX = 0, startY = 0;
 
-        function redo() {
-            if (redoStack.length > 0) {
-                historyStack.push(JSON.stringify(orgData));
-                const nextState = redoStack.pop();
-                orgData = JSON.parse(nextState);
-                renderNodes();
-                autoSaveToLocalStorage();
-            }
-        }
-
-        // Auto Save & Manual Save Handlers
-        function markUnsaved() {
-            hasUnsavedChanges = true;
-            const status = document.getElementById('saveStatus');
-            if (status) {
-                status.className = "inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300";
-                status.innerHTML = `<i data-lucide="alert-circle" class="w-3 h-3"></i> Belum Disimpan`;
-            }
-            if (window.lucide) lucide.createIcons();
-        }
-
-        function autoSaveToLocalStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(orgData));
-                hasUnsavedChanges = false;
-                const status = document.getElementById('saveStatus');
-                if (status) {
-                    status.className = "inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200";
-                    status.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Tersimpan`;
-                }
-                if (window.lucide) lucide.createIcons();
-            } catch (e) {
-                console.error("Gagal menyimpan ke local storage", e);
-            }
-        }
-
-        // Viewport Transform State (Zoom & Pan)
-        let zoomScale = 0.85;
-        let panX = 40;
-        let panY = 20;
-
-        let viewport, transformer, container, svg, swimlanesContainer;
-
-        // Multi-Select State
+        // Selection & Dragging State
         let selectedNodeIds = new Set();
+        let draggingNodeId = null;
+        let dragOffset = {};
+        let isSelectingBox = false;
+        let boxSelectStart = { x: 0, y: 0 };
+        let selectionBoxEl = null;
 
-        function updateTransform() {
-            if (!transformer) return;
-            transformer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
-            const zoomText = document.getElementById('zoomLevelText');
-            if (zoomText) zoomText.innerText = `${Math.round(zoomScale * 100)}%`;
-        }
+        // DOM Elements
+        const viewport = document.getElementById('viewport');
+        const canvas = document.getElementById('canvas');
+        const nodesContainer = document.getElementById('nodes-container');
+        const svgContainer = document.getElementById('connections-svg');
+        const zoomLabel = document.getElementById('zoom-level-label');
+        const searchInput = document.getElementById('search-input');
+        const lastUpdateText = document.getElementById('last-update-text');
 
-        // Render Swimlanes
-        function renderSwimlanes() {
-            if (!swimlanesContainer) return;
-            swimlanesContainer.innerHTML = '';
-            LEVEL_ZONES.forEach(zone => {
-                const lane = document.createElement('div');
-                lane.className = 'swimlane';
-                lane.style.top = `${zone.top}px`;
-                lane.style.height = `${zone.height}px`;
-                lane.style.backgroundColor = zone.bg;
-
-                lane.innerHTML = `
-                    <div class="swimlane-label" style="background-color: ${zone.labelBg}; color: ${zone.labelColor};">
-                        ${zone.name}
-                    </div>
-                `;
-                swimlanesContainer.appendChild(lane);
-            });
-        }
-
-        // Snap Y position to nearest level swimlane center
-        function snapToNearestLevelY(y) {
-            let closestCenter = LEVEL_ZONES[0].centerY;
-            let minDiff = Math.abs(y - closestCenter);
-
-            LEVEL_ZONES.forEach(zone => {
-                const diff = Math.abs(y - zone.centerY);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestCenter = zone.centerY;
-                }
-            });
-
-            return closestCenter;
-        }
-
-        // Multi-Selection Helper Functions
-        function clearMultiSelection() {
-            selectedNodeIds.clear();
-            updateSelectedNodeClasses();
-        }
-
-        function updateSelectedNodeClasses() {
-            document.querySelectorAll('.org-node').forEach(node => {
-                const nodeId = node.id.replace('node-', '');
-                if (selectedNodeIds.has(nodeId)) {
-                    node.classList.add('multi-selected');
-                } else {
-                    node.classList.remove('multi-selected');
-                }
-            });
-        }
-
-        // Render All Nodes on Canvas
-        function renderNodes() {
-            if (!container) return;
-            container.innerHTML = '';
-
-            orgData.forEach(item => {
-                const node = document.createElement('div');
-                node.id = `node-${item.id}`;
-                node.className = `org-node node-${item.type} ${selectedNodeIds.has(item.id) ? 'multi-selected' : ''}`;
-                node.style.left = `${item.x}px`;
-                node.style.top = `${item.y}px`;
-                node.setAttribute('data-name', item.name.toLowerCase());
-                node.setAttribute('data-title', item.title.toLowerCase());
-
-                node.innerHTML = `
-                    <div class="node-actions">
-                        <button onclick="openEditModal('${item.id}')" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
-                            <i data-lucide="pencil" class="w-3 h-3"></i>
-                        </button>
-                    </div>
-                    <div class="font-bold text-xs truncate max-w-full px-1">${item.name}</div>
-                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${item.title}</div>
-                `;
-
-                node.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (isConnectingMode) {
-                        handleConnectClick(item.id);
-                    }
-                });
-
-                node.addEventListener('dblclick', (e) => {
-                    e.stopPropagation();
-                    openEditModal(item.id);
-                });
-
-                makeDraggable(node, item.id);
-                container.appendChild(node);
-            });
-
-            if (window.lucide) lucide.createIcons();
+        // Initialize App
+        function initApp() {
+            renderNodes();
             updateConnectors();
+            setupCanvasInteractions();
+            updateZoomLabel();
+            
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('.node-card').forEach(card => {
+                    const name = card.dataset.name.toLowerCase();
+                    const pos = card.dataset.position.toLowerCase();
+                    if (term === '' || name.includes(term) || pos.includes(term)) {
+                        card.style.opacity = '1';
+                        card.style.transform = 'scale(1)';
+                    } else {
+                        card.style.opacity = '0.3';
+                    }
+                });
+            });
         }
 
-        // Generate Clean Unified Tree Bus Connectors
-        function generateConnectorsSvgString(offsetX = 0, offsetY = 0, markerId = 'arrow') {
-            let pathsSvg = '';
-            const nodeMap = {};
-            orgData.forEach(d => nodeMap[d.id] = d);
+        // Save State to History & LocalStorage (Auto-Save)
+        function saveState(actionName = "Perubahan") {
+            historyStack.push(JSON.stringify(nodes));
+            if (historyStack.length > 30) historyStack.shift();
+            redoStack = []; // clear redo stack on new action
+            
+            localStorage.setItem('stk_nodes_v4', JSON.stringify(nodes));
+            const now = new Date();
+            lastUpdateText.textContent = `Terakhir diperbarui: ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} (${actionName})`;
+        }
 
-            const childrenByParent = {};
-            orgData.forEach(item => {
-                if (item.parent && nodeMap[item.parent]) {
-                    if (!childrenByParent[item.parent]) {
-                        childrenByParent[item.parent] = [];
+        function undoAction() {
+            if (historyStack.length === 0) return;
+            redoStack.push(JSON.stringify(nodes));
+            const prevState = historyStack.pop();
+            nodes = JSON.parse(prevState);
+            localStorage.setItem('stk_nodes_v4', JSON.stringify(nodes));
+            renderNodes();
+            updateConnectors();
+            lastUpdateText.textContent = "Terakhir diperbarui: Undo dilakukan";
+        }
+
+        function redoAction() {
+            if (redoStack.length === 0) return;
+            historyStack.push(JSON.stringify(nodes));
+            const nextState = redoStack.pop();
+            nodes = JSON.parse(nextState);
+            localStorage.setItem('stk_nodes_v4', JSON.stringify(nodes));
+            renderNodes();
+            updateConnectors();
+            lastUpdateText.textContent = "Terakhir diperbarui: Redo dilakukan";
+        }
+
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    redoAction();
+                } else {
+                    undoAction();
+                }
+            } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                redoAction();
+            }
+        });
+
+        // Render Nodes to DOM
+        function renderNodes() {
+            nodesContainer.innerHTML = '';
+            nodes.forEach(node => {
+                const card = document.createElement('div');
+                card.className = `absolute node-card bg-white rounded-xl border-2 shadow-sm p-3 w-64 pointer-events-auto cursor-pointer flex flex-col justify-between ${selectedNodeIds.has(node.id) ? 'border-indigo-600 ring-2 ring-indigo-400/50 shadow-md' : 'border-slate-200'}`;
+                card.style.left = `${node.x}px`;
+                card.style.top = `${node.y}px`;
+                card.dataset.id = node.id;
+                card.dataset.name = node.name;
+                card.dataset.position = node.position;
+
+                let badgeColor = 'bg-slate-100 text-slate-700 border-slate-200';
+                if (node.level === 'bod') badgeColor = 'bg-slate-900 text-white border-slate-900';
+                else if (node.level === 'manager') badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                else if (node.level === 'senior') badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                else if (node.level === 'junior') badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                else if (node.level === 'probation') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between mb-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badgeColor}">${node.level}</span>
+                        <div class="flex items-center space-x-1">
+                            <button onclick="event.stopPropagation(); openEditModal('${node.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded transition" title="Edit"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="event.stopPropagation(); deleteNode('${node.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition" title="Hapus"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm leading-tight truncate">${node.name}</h4>
+                        <p class="text-xs text-slate-500 font-medium truncate mt-0.5">${node.position}</p>
+                    </div>
+                `;
+
+                // Node Mouse & Drag Events
+                card.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('button')) return;
+                    e.stopPropagation();
+
+                    if (e.shiftKey) {
+                        if (selectedNodeIds.has(node.id)) selectedNodeIds.delete(node.id);
+                        else selectedNodeIds.add(node.id);
+                    } else {
+                        if (!selectedNodeIds.has(node.id)) {
+                            selectedNodeIds.clear();
+                            selectedNodeIds.add(node.id);
+                        }
                     }
-                    childrenByParent[item.parent].push(item);
+                    renderNodes();
+
+                    draggingNodeId = node.id;
+                    const mouseX = (e.clientX - panX) / scale;
+                    const mouseY = (e.clientY - panY) / scale;
+                    
+                    dragOffset = {};
+                    selectedNodeIds.forEach(id => {
+                        const n = nodes.find(item => item.id === id);
+                        if (n) {
+                            dragOffset[id] = { dx: n.x - mouseX, dy: n.y - mouseY };
+                        }
+                    });
+                });
+
+                card.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    openEditModal(node.id);
+                });
+
+                nodesContainer.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // Unified Tree Bus Connector SVG Generation
+        function updateConnectors() {
+            let svgContent = '';
+            
+            // Group children by manager
+            const childrenMap = {};
+            nodes.forEach(n => {
+                if (n.manager) {
+                    if (!childrenMap[n.manager]) childrenMap[n.manager] = [];
+                    childrenMap[n.manager].push(n);
                 }
             });
 
-            Object.keys(childrenByParent).forEach(parentId => {
-                const parent = nodeMap[parentId];
-                const children = childrenByParent[parentId];
+            const cardWidth = 256;
+            const cardHeight = 85;
 
-                const pX = (parent.x - offsetX) + 105;
-                const pY = (parent.y - offsetY) + 64;
+            Object.keys(childrenMap).forEach(managerId => {
+                const manager = nodes.find(n => n.id === managerId);
+                if (!manager) return;
+
+                const children = childrenMap[managerId];
+                if (children.length === 0) return;
+
+                const startX = manager.x + cardWidth / 2;
+                const startY = manager.y + cardHeight;
+
+                // Check if all children share the same Y level
+                const firstChildY = children[0].y;
+                const midY = startY + (firstChildY - startY) / 2;
+
+                // Sort children by X coordinate
+                children.sort((a, b) => a.x - b.x);
 
                 if (children.length === 1) {
                     const child = children[0];
-                    const cX = (child.x - offsetX) + 105;
-                    const cY = (child.y - offsetY);
-
-                    let pathD = "";
-                    if (Math.abs(pX - cX) < 2) {
-                        pathD = `M ${pX} ${pY} L ${cX} ${cY}`;
-                    } else {
-                        const midY = pY + (cY - pY) / 2;
-                        pathD = `M ${pX} ${pY} L ${pX} ${midY} L ${cX} ${midY} L ${cX} ${cY}`;
-                    }
-
-                    pathsSvg += `<path d="${pathD}" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#${markerId})" />`;
+                    const childX = child.x + cardWidth / 2;
+                    svgContent += `<path d="M ${startX} ${startY} V ${child.y}" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" />`;
+                    svgContent += `<polygon points="${childX},${child.y} ${childX-4},${child.y-8} ${childX+4},${child.y-8}" fill="#64748b" />`;
                 } else {
-                    const minChildY = Math.min(...children.map(c => c.y - offsetY));
-                    const busY = pY + Math.min(30, (minChildY - pY) / 2);
+                    const firstX = children[0].x + cardWidth / 2;
+                    const lastX = children[children.length - 1].x + cardWidth / 2;
 
-                    const childCenterXArray = children.map(c => (c.x - offsetX) + 105);
-                    const minBusX = Math.min(pX, ...childCenterXArray);
-                    const maxBusX = Math.max(pX, ...childCenterXArray);
+                    // Vertical down from manager to midY
+                    svgContent += `<path d="M ${startX} ${startY} V ${midY}" fill="none" stroke="#64748b" stroke-width="2" />`;
+                    // Horizontal bus connecting all children X range
+                    svgContent += `<path d="M ${firstX} ${midY} H ${lastX}" fill="none" stroke="#64748b" stroke-width="2" />`;
 
-                    pathsSvg += `<path d="M ${pX} ${pY} L ${pX} ${busY}" stroke="#64748b" stroke-width="2" fill="none" />`;
-                    pathsSvg += `<path d="M ${minBusX} ${busY} L ${maxBusX} ${busY}" stroke="#64748b" stroke-width="2" fill="none" />`;
-
+                    // Dropdowns to each child
                     children.forEach(child => {
-                        const cX = (child.x - offsetX) + 105;
-                        const cY = (child.y - offsetY);
-                        pathsSvg += `<path d="M ${cX} ${busY} L ${cX} ${cY}" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#${markerId})" />`;
+                        const childX = child.x + cardWidth / 2;
+                        svgContent += `<path d="M ${childX} ${midY} V ${child.y}" fill="none" stroke="#64748b" stroke-width="2" />`;
+                        svgContent += `<polygon points="${childX},${child.y} ${childX-4},${child.y-8} ${childX+4},${child.y-8}" fill="#64748b" />`;
                     });
                 }
             });
 
-            return pathsSvg;
+            svgContainer.innerHTML = svgContent;
         }
 
-        function updateConnectors() {
-            if (!svg) return;
-            svg.innerHTML = `
-                <defs>
-                    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
-                    </marker>
-                </defs>
-                ${generateConnectorsSvgString(0, 0, 'arrow')}
-            `;
-        }
-
-        // Draggable Functionality with Magnetic Level Snap & Multi-Select Group Support
-        function makeDraggable(element, id) {
-            let isDragging = false;
-            let startX, startY;
-            let initialPositions = {};
-
-            element.addEventListener('mousedown', (e) => {
-                if (isConnectingMode || e.target.closest('.node-actions')) return;
-                e.stopPropagation();
-
-                saveStateToHistory();
-
-                if (!selectedNodeIds.has(id) && !e.shiftKey) {
-                    clearMultiSelection();
-                    selectedNodeIds.add(id);
-                    updateSelectedNodeClasses();
-                } else if (e.shiftKey && !selectedNodeIds.has(id)) {
-                    selectedNodeIds.add(id);
-                    updateSelectedNodeClasses();
-                }
-
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
-
-                selectedNodeIds.forEach(selectedId => {
-                    const nodeData = orgData.find(d => d.id === selectedId);
-                    if (nodeData) {
-                        initialPositions[selectedId] = { x: nodeData.x, y: nodeData.y };
-                        const nodeEl = document.getElementById(`node-${selectedId}`);
-                        if (nodeEl) nodeEl.classList.add('dragging');
-                    }
-                });
-
-                function onMouseMove(e) {
-                    if (!isDragging) return;
-                    const dx = (e.clientX - startX) / zoomScale;
-                    const dy = (e.clientY - startY) / zoomScale;
-
-                    selectedNodeIds.forEach(selectedId => {
-                        const nodeData = orgData.find(d => d.id === selectedId);
-                        const initialPos = initialPositions[selectedId];
-                        if (nodeData && initialPos) {
-                            nodeData.x = initialPos.x + dx;
-                            nodeData.y = initialPos.y + dy;
-
-                            const nodeEl = document.getElementById(`node-${selectedId}`);
-                            if (nodeEl) {
-                                nodeEl.style.left = `${nodeData.x}px`;
-                                nodeEl.style.top = `${nodeData.y}px`;
-                            }
-                        }
-                    });
-
-                    updateConnectors();
-                }
-
-                function onMouseUp() {
-                    if (isDragging) {
-                        isDragging = false;
-
-                        selectedNodeIds.forEach(selectedId => {
-                            const nodeData = orgData.find(d => d.id === selectedId);
-                            if (nodeData) {
-                                nodeData.y = snapToNearestLevelY(nodeData.y);
-                                const nodeEl = document.getElementById(`node-${selectedId}`);
-                                if (nodeEl) {
-                                    nodeEl.style.top = `${nodeData.y}px`;
-                                    nodeEl.classList.remove('dragging');
-                                }
-                            }
-                        });
-
-                        updateConnectors();
-                        autoSaveToLocalStorage();
-
-                        document.removeEventListener('mousemove', onMouseMove);
-                        document.removeEventListener('mouseup', onMouseUp);
-                    }
-                }
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
-        }
-
-        // Interactive Re-Connect Mode
-        let isConnectingMode = false;
-        let connectChildId = null;
-
-        function toggleConnectMode() {
-            isConnectingMode = !isConnectingMode;
-            connectChildId = null;
-
-            const banner = document.getElementById('connectBanner');
-            const btn = document.getElementById('connectModeBtn');
-
-            if (isConnectingMode) {
-                if (banner) banner.classList.remove('hidden');
-                if (btn) btn.classList.add('bg-amber-100', 'border-amber-400');
-                const bannerText = document.getElementById('connectBannerText');
-                if (bannerText) bannerText.innerText = 'Langkah 1: Klik Kotak Bawahan (Child)';
-            } else {
-                if (banner) banner.classList.add('hidden');
-                if (btn) btn.classList.remove('bg-amber-100', 'border-amber-400');
-                clearNodeHighlights();
-            }
-        }
-
-        function handleConnectClick(nodeId) {
-            if (!connectChildId) {
-                connectChildId = nodeId;
-                const nodeEl = document.getElementById(`node-${nodeId}`);
-                if (nodeEl) nodeEl.classList.add('selected-child');
-                const bannerText = document.getElementById('connectBannerText');
-                if (bannerText) bannerText.innerText = `Bawahan dipilih: ${getNodeName(nodeId)}. Sekarang klik Kotak Atasan (Parent)`;
-                
-                orgData.forEach(d => {
-                    if (d.id !== nodeId) {
-                        const targetEl = document.getElementById(`node-${d.id}`);
-                        if (targetEl) targetEl.classList.add('target-parent');
-                    }
-                });
-            } else {
-                if (connectChildId === nodeId) {
-                    alert("Sebuah node tidak bisa menjadi atasan untuk dirinya sendiri.");
-                    return;
-                }
-
-                if (isDescendant(connectChildId, nodeId)) {
-                    alert("Tidak dapat menghubungkan! Hal ini akan menyebabkan siklus/looping melingkar.");
-                    return;
-                }
-
-                saveStateToHistory();
-                const childObj = orgData.find(d => d.id === connectChildId);
-                childObj.parent = nodeId;
-
-                toggleConnectMode();
-                renderNodes();
-                autoSaveToLocalStorage();
-            }
-        }
-
-        function isDescendant(parentId, childId) {
-            let current = orgData.find(d => d.id === childId);
-            while (current && current.parent) {
-                if (current.parent === parentId) return true;
-                current = orgData.find(d => d.id === current.parent);
-            }
-            return false;
-        }
-
-        function clearNodeHighlights() {
-            document.querySelectorAll('.org-node').forEach(node => {
-                node.classList.remove('selected-child', 'target-parent');
-            });
-        }
-
-        function getNodeName(id) {
-            const item = orgData.find(d => d.id === id);
-            return item ? item.name : id;
-        }
-
-        // Helper to Convert String to Title Case (Capitalize First Letter of Every Word)
-        function toTitleCase(str) {
-            return str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function(a) { return a.toUpperCase(); });
-        }
-
-        // Map Level Key to Swimlane Center Y Position
-        function getCenterYForLevel(levelType) {
-            const levelZoneMap = {
-                'bod': 100,
-                'manager': 290,
-                'senior_staff': 490,
-                'junior_staff': 690,
-                'probation': 890
-            };
-            return levelZoneMap[levelType] || 490;
-        }
-
-        // Populate Positions List for Dropdown
-        function populateTitleDropdown(selectedTitle = '') {
-            const titleSelect = document.getElementById('modalTitleSelect');
-            const customInput = document.getElementById('modalCustomTitleInput');
-            if (!titleSelect) return;
-
-            // Extract unique titles from orgData
-            const titlesSet = new Set();
-            orgData.forEach(d => {
-                if (d.title) titlesSet.add(d.title.trim());
-            });
-
-            const uniqueTitles = Array.from(titlesSet).sort();
-
-            titleSelect.innerHTML = '';
-            uniqueTitles.forEach(title => {
-                titleSelect.innerHTML += `<option value="${title}">${title}</option>`;
-            });
-            titleSelect.innerHTML += `<option value="__NEW_TITLE__">+ Tambah Posisi Baru...</option>`;
-
-            if (selectedTitle && uniqueTitles.includes(selectedTitle)) {
-                titleSelect.value = selectedTitle;
-                if (customInput) customInput.classList.add('hidden');
-            } else if (selectedTitle) {
-                titleSelect.value = '__NEW_TITLE__';
-                if (customInput) {
-                    customInput.value = selectedTitle;
-                    customInput.classList.remove('hidden');
-                }
-            } else {
-                if (customInput) customInput.classList.add('hidden');
-            }
-        }
-
-        // Modal Form Handlers
-        function openEditModal(nodeId = null) {
-            const modal = document.getElementById('nodeModal');
-            const parentSelect = document.getElementById('modalParentSelect');
-            const titleSelect = document.getElementById('modalTitleSelect');
-            const customTitleInput = document.getElementById('modalCustomTitleInput');
-            
-            if (!modal || !parentSelect) return;
-
-            parentSelect.innerHTML = '<option value="">-- Tidak Ada (Top Level / C-Level) --</option>';
-            orgData.forEach(d => {
-                if (d.id !== nodeId) {
-                    parentSelect.innerHTML += `<option value="${d.id}">${d.name} (${d.title})</option>`;
-                }
-            });
-
-            if (nodeId) {
-                const item = orgData.find(d => d.id === nodeId);
-                document.getElementById('modalTitle').innerText = 'Edit Data Personil';
-                document.getElementById('modalNodeId').value = item.id;
-                document.getElementById('modalName').value = item.name;
-                populateTitleDropdown(item.title);
-                document.getElementById('modalParentSelect').value = item.parent || '';
-                document.getElementById('modalTypeSelect').value = item.type || 'staff';
-                document.getElementById('deleteNodeBtn').classList.remove('hidden');
-            } else {
-                document.getElementById('modalTitle').innerText = 'Tambah Personil Baru';
-                document.getElementById('modalNodeId').value = '';
-                document.getElementById('modalName').value = '';
-                populateTitleDropdown('');
-                document.getElementById('modalParentSelect').value = '';
-                document.getElementById('modalTypeSelect').value = 'junior_staff';
-                document.getElementById('deleteNodeBtn').classList.add('hidden');
-            }
-
-            modal.classList.remove('hidden');
-        }
-
-        function closeModal() {
-            const modal = document.getElementById('nodeModal');
-            if (modal) modal.classList.add('hidden');
-        }
-
-        // High-Resolution Pure SVG to PNG Export (Guaranteed 100% Match with App Layout)
-        function exportChartToPng() {
-            try {
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                orgData.forEach(node => {
-                    if (node.x < minX) minX = node.x;
-                    if (node.y < minY) minY = node.y;
-                    if (node.x + 210 > maxX) maxX = node.x + 210;
-                    if (node.y + 64 > maxY) maxY = node.y + 64;
-                });
-
-                const padding = 60;
-                const startX = Math.max(0, minX - padding);
-                const startY = Math.max(0, minY - padding);
-                const exportWidth = (maxX - minX) + (padding * 2);
-                const exportHeight = (maxY - minY) + (padding * 2);
-
-                // Swimlanes XML for Export
-                let swimlanesXml = '';
-                LEVEL_ZONES.forEach(zone => {
-                    const zTop = zone.top - startY;
-                    if (zTop + zone.height > 0 && zTop < exportHeight) {
-                        swimlanesXml += `
-                            <rect x="0" y="${zTop}" width="${exportWidth}" height="${zone.height}" fill="${zone.bg}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4" />
-                            <rect x="15" y="${zTop + 10}" width="180" height="24" rx="6" fill="${zone.labelBg}" />
-                            <text x="25" y="${zTop + 26}" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="${zone.labelColor}">${zone.name}</text>
-                        `;
-                    }
-                });
-
-                // Connectors XML (Uses EXACT Same Unified Bus Logic as App Canvas)
-                const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport');
-
-                // Nodes XML (Pure SVG Rects and Texts matching card styling)
-                let nodesXml = '';
-                orgData.forEach(item => {
-                    const nx = item.x - startX;
-                    const ny = item.y - startY;
-
-                    let bgFill = "#ffffff";
-                    let strokeColor = "#cbd5e1";
-                    let nameColor = "#1e293b";
-                    let titleColor = "#64748b";
-                    let accentBar = "";
-
-                    if (item.type === 'bod') {
-                        bgFill = "#0f172a";
-                        strokeColor = "#334155";
-                        nameColor = "#ffffff";
-                        titleColor = "#cbd5e1";
-                    } else if (item.type === 'manager') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#8b5cf6" />`;
-                    else if (item.type === 'pm') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#f59e0b" />`;
-                    else if (item.type === 'sm') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#10b981" />`;
-                    else if (item.type === 'staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#3b82f6" />`;
-                    else if (item.type === 'vacant') {
-                        bgFill = "#fffbe8";
-                        strokeColor = "#f59e0b";
-                    }
-
-                    const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const safeTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-                    nodesXml += `
-                        <g>
-                            <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1.5" />
-                            ${accentBar}
-                            <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="${nameColor}">${safeName}</text>
-                            <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" font-weight="500" fill="${titleColor}">${safeTitle}</text>
-                        </g>
-                    `;
-                });
-
-                const svgString = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">
-                        <defs>
-                            <style>
-                                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
-                            </style>
-                            <marker id="arrowExport" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
-                            </marker>
-                        </defs>
-                        <rect width="100%" height="100%" fill="#f8fafc" />
-                        ${swimlanesXml}
-                        ${pathsSvg}
-                        ${nodesXml}
-                    </svg>
-                `;
-
-                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const img = new Image();
-
-                img.onload = function () {
-                    const canvas = document.createElement('canvas');
-                    const scale = 2; // High Resolution Retina
-                    canvas.width = exportWidth * scale;
-                    canvas.height = exportHeight * scale;
-                    const ctx = canvas.getContext('2d');
-                    ctx.scale(scale, scale);
-
-                    ctx.drawImage(img, 0, 0);
-                    URL.revokeObjectURL(url);
-
-                    const pngUrl = canvas.toDataURL('image/png');
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = pngUrl;
-                    downloadLink.download = 'Struktur_Organisasi_PT_STK.png';
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
-                };
-
-                img.onerror = function() {
-                    alert("Gagal memproses gambar PNG. Silakan coba lagi.");
-                };
-
-                img.src = url;
-            } catch (err) {
-                console.error("Export PNG Error:", err);
-                alert("Terjadi kesalahan saat mengunduh gambar.");
-            }
-        }
-
-        // Initialize App & Event Listeners
-        function initApp() {
-            viewport = document.getElementById('viewport');
-            transformer = document.getElementById('chartTransformer');
-            container = document.getElementById('nodesContainer');
-            svg = document.getElementById('svgConnectors');
-            swimlanesContainer = document.getElementById('swimlanesContainer');
-            const selectionBox = document.getElementById('selectionBox');
-
-            if (!viewport) return;
-
-            renderSwimlanes();
-
-            // Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z, Cmd+S, Ctrl+Z, Ctrl+Y, Ctrl+S)
-            window.addEventListener('keydown', (e) => {
-                const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-                const cmdKey = isMac ? e.metaKey : e.ctrlKey;
-
-                if (cmdKey && e.shiftKey && e.key.toLowerCase() === 'z') {
-                    e.preventDefault();
-                    redo();
-                } else if (cmdKey && e.key.toLowerCase() === 'z') {
-                    e.preventDefault();
-                    undo();
-                } else if (cmdKey && e.key.toLowerCase() === 'y') {
-                    e.preventDefault();
-                    redo();
-                } else if (cmdKey && e.key.toLowerCase() === 's') {
-                    e.preventDefault();
-                    autoSaveToLocalStorage();
-                }
-            });
-
-            // Box Area Drag Selection / Canvas Panning
-            let isPanning = false;
-            let panStartX = 0, panStartY = 0;
-            let isBoxSelecting = false;
-            let boxStartX = 0, boxStartY = 0;
-
+        // Canvas Panning & Mouse Interactions
+        function setupCanvasInteractions() {
             viewport.addEventListener('mousedown', (e) => {
-                if (e.target.closest('.org-node') || e.target.closest('button') || e.target.closest('input')) return;
-
+                if (e.target.closest('.node-card') || e.target.closest('button') || e.target.closest('input')) return;
+                
                 if (e.shiftKey) {
-                    isBoxSelecting = true;
-                    const chartRect = document.getElementById('chartArea').getBoundingClientRect();
-                    boxStartX = (e.clientX - chartRect.left) / zoomScale;
-                    boxStartY = (e.clientY - chartRect.top) / zoomScale;
-
-                    if (selectionBox) {
-                        selectionBox.style.left = `${boxStartX}px`;
-                        selectionBox.style.top = `${boxStartY}px`;
-                        selectionBox.style.width = '0px';
-                        selectionBox.style.height = '0px';
-                        selectionBox.style.display = 'block';
+                    isSelectingBox = true;
+                    boxSelectStart = { x: e.clientX, y: e.clientY };
+                    
+                    if (!selectionBoxEl) {
+                        selectionBoxEl = document.createElement('div');
+                        selectionBoxEl.className = 'absolute border-2 border-indigo-500 bg-indigo-500/10 z-40 pointer-events-none rounded';
+                        document.body.appendChild(selectionBoxEl);
                     }
+                    selectionBoxEl.style.left = `${e.clientX}px`;
+                    selectionBoxEl.style.top = `${e.clientY}px`;
+                    selectionBoxEl.style.width = `0px`;
+                    selectionBoxEl.style.height = `0px`;
+                    selectionBoxEl.classList.remove('hidden');
                 } else {
-                    clearMultiSelection();
                     isPanning = true;
-                    viewport.classList.add('grabbing');
-                    panStartX = e.clientX - panX;
-                    panStartY = e.clientY - panY;
+                    startX = e.clientX - panX;
+                    startY = e.clientY - panY;
+                    selectedNodeIds.clear();
+                    renderNodes();
                 }
             });
 
             window.addEventListener('mousemove', (e) => {
-                if (isPanning) {
-                    panX = e.clientX - panStartX;
-                    panY = e.clientY - panStartY;
-                    updateTransform();
-                } else if (isBoxSelecting && selectionBox) {
-                    const chartRect = document.getElementById('chartArea').getBoundingClientRect();
-                    const currentX = (e.clientX - chartRect.left) / zoomScale;
-                    const currentY = (e.clientY - chartRect.top) / zoomScale;
+                if (draggingNodeId) {
+                    const mouseX = (e.clientX - panX) / scale;
+                    const mouseY = (e.clientY - panY) / scale;
 
-                    const left = Math.min(boxStartX, currentX);
-                    const top = Math.min(boxStartY, currentY);
-                    const width = Math.abs(currentX - boxStartX);
-                    const height = Math.abs(currentY - boxStartY);
-
-                    selectionBox.style.left = `${left}px`;
-                    selectionBox.style.top = `${top}px`;
-                    selectionBox.style.width = `${width}px`;
-                    selectionBox.style.height = `${height}px`;
-
-                    orgData.forEach(item => {
-                        const nodeRight = item.x + 210;
-                        const nodeBottom = item.y + 64;
-                        const intersects = (item.x < left + width && nodeRight > left && item.y < top + height && nodeBottom > top);
-
-                        if (intersects) {
-                            selectedNodeIds.add(item.id);
-                        } else {
-                            selectedNodeIds.delete(item.id);
+                    selectedNodeIds.forEach(id => {
+                        const node = nodes.find(n => n.id === id);
+                        const offset = dragOffset[id];
+                        if (node && offset) {
+                            node.x = mouseX + offset.dx;
+                            let targetY = mouseY + offset.dy;
+                            
+                            // Magnetic Snap to Level Y Center
+                            const targetLevel = node.level;
+                            if (levelYMap[targetLevel] !== undefined) {
+                                const levelCenterY = levelYMap[targetLevel];
+                                if (Math.abs(targetY - levelCenterY) < 80) {
+                                    targetY = levelCenterY;
+                                }
+                            }
+                            node.y = targetY;
                         }
                     });
-                    updateSelectedNodeClasses();
+
+                    renderNodes();
+                    updateConnectors();
+                } else if (isPanning) {
+                    panX = e.clientX - startX;
+                    panY = e.clientY - startY;
+                    updateTransform();
+                } else if (isSelectingBox && selectionBoxEl) {
+                    const currentX = e.clientX;
+                    const currentY = e.clientY;
+                    const left = Math.min(boxSelectStart.x, currentX);
+                    const top = Math.min(boxSelectStart.y, currentY);
+                    const width = Math.abs(currentX - boxSelectStart.x);
+                    const height = Math.abs(currentY - boxSelectStart.y);
+
+                    selectionBoxEl.style.left = `${left}px`;
+                    selectionBoxEl.style.top = `${top}px`;
+                    selectionBoxEl.style.width = `${width}px`;
+                    selectionBoxEl.style.height = `${height}px`;
+
+                    // Select nodes inside box
+                    const rect = selectionBoxEl.getBoundingClientRect();
+                    selectedNodeIds.clear();
+                    document.querySelectorAll('.node-card').forEach(card => {
+                        const cardRect = card.getBoundingClientRect();
+                        if (!(cardRect.right < rect.left || cardRect.left > rect.right || cardRect.bottom < rect.top || cardRect.top > rect.bottom)) {
+                            selectedNodeIds.add(card.dataset.id);
+                        }
+                    });
+                    renderNodes();
                 }
             });
 
             window.addEventListener('mouseup', () => {
-                if (isPanning) {
-                    isPanning = false;
-                    viewport.classList.remove('grabbing');
+                if (draggingNodeId) {
+                    draggingNodeId = null;
+                    saveState("Geser Posisi");
                 }
-                if (isBoxSelecting) {
-                    isBoxSelecting = false;
-                    if (selectionBox) selectionBox.style.display = 'none';
+                isPanning = false;
+                if (isSelectingBox) {
+                    isSelectingBox = false;
+                    if (selectionBoxEl) selectionBoxEl.classList.add('hidden');
                 }
             });
 
-            // Wheel Zooming
+            // Zoom with Mouse Wheel
             viewport.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                const delta = e.deltaY < 0 ? 1 : -1;
-                
-                const oldScale = zoomScale;
-                if (delta > 0) {
-                    zoomScale = Math.min(2.5, zoomScale * 1.08);
+                const zoomFactor = 1.1;
+                const oldScale = scale;
+                if (e.deltaY < 0) {
+                    scale = Math.min(scale * zoomFactor, 2.0);
                 } else {
-                    zoomScale = Math.max(0.2, zoomScale / 1.08);
+                    scale = Math.max(scale / zoomFactor, 0.25);
                 }
 
                 const rect = viewport.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
 
-                panX = mouseX - (mouseX - panX) * (zoomScale / oldScale);
-                panY = mouseY - (mouseY - panY) * (zoomScale / oldScale);
+                panX = mouseX - (mouseX - panX) * (scale / oldScale);
+                panY = mouseY - (mouseY - panY) * (scale / oldScale);
 
                 updateTransform();
+                updateZoomLabel();
             }, { passive: false });
+        }
 
-            // Form Submit
-            const nodeForm = document.getElementById('nodeForm');
-            const titleSelectEl = document.getElementById('modalTitleSelect');
-            const customTitleInputEl = document.getElementById('modalCustomTitleInput');
-            const nameInputEl = document.getElementById('modalName');
+        function updateTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        }
 
-            if (titleSelectEl && customTitleInputEl) {
-                titleSelectEl.addEventListener('change', (e) => {
-                    if (e.target.value === '__NEW_TITLE__') {
-                        customTitleInputEl.classList.remove('hidden');
-                        customTitleInputEl.focus();
-                    } else {
-                        customTitleInputEl.classList.add('hidden');
-                    }
-                });
-            }
+        function updateZoomLabel() {
+            zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+        }
 
-            // Capitalize Name Input Realtime
-            if (nameInputEl) {
-                nameInputEl.addEventListener('blur', (e) => {
-                    e.target.value = toTitleCase(e.target.value);
-                });
-            }
-
-            if (nodeForm) {
-                nodeForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    saveStateToHistory();
-
-                    const id = document.getElementById('modalNodeId').value;
-                    const rawName = document.getElementById('modalName').value;
-                    const name = toTitleCase(rawName);
-
-                    let title = titleSelectEl.value;
-                    if (title === '__NEW_TITLE__') {
-                        title = customTitleInputEl.value.trim();
-                        if (!title) {
-                            alert("Silakan masukkan nama posisi baru.");
-                            return;
-                        }
-                    }
-
-                    const parent = document.getElementById('modalParentSelect').value || null;
-                    const type = document.getElementById('modalTypeSelect').value;
-                    const targetY = getCenterYForLevel(type);
-
-                    if (id) {
-                        const item = orgData.find(d => d.id === id);
-                        item.name = name;
-                        item.title = title;
-                        item.parent = parent;
-                        item.type = type;
-                        item.y = targetY; // Move node to designated level area center
-                    } else {
-                        const newId = 'node_' + Date.now();
-                        orgData.push({
-                            id: newId,
-                            name: name,
-                            title: title,
-                            parent: parent,
-                            type: type,
-                            x: Math.abs(panX) + 500,
-                            y: targetY // Auto position in selected level area
-                        });
-                    }
-
-                    closeModal();
-                    renderNodes();
-                    autoSaveToLocalStorage();
-                });
-            }
-
-            // Delete Node Button
-            const deleteNodeBtn = document.getElementById('deleteNodeBtn');
-            if (deleteNodeBtn) {
-                deleteNodeBtn.addEventListener('click', () => {
-                    const id = document.getElementById('modalNodeId').value;
-                    if (id && confirm(`Yakin ingin menghapus ${getNodeName(id)}?`)) {
-                        saveStateToHistory();
-                        const nodeToDelete = orgData.find(d => d.id === id);
-                        orgData.forEach(d => {
-                            if (d.parent === id) d.parent = nodeToDelete.parent;
-                        });
-                        orgData = orgData.filter(d => d.id !== id);
-                        closeModal();
-                        renderNodes();
-                        autoSaveToLocalStorage();
-                    }
-                });
-            }
-
-            // Search Input
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) {
-                searchInput.addEventListener('input', (e) => {
-                    const query = e.target.value.toLowerCase().trim();
-                    document.querySelectorAll('.org-node').forEach(node => {
-                        const name = node.getAttribute('data-name');
-                        const title = node.getAttribute('data-title');
-                        if (query !== '' && (name.includes(query) || title.includes(query))) {
-                            node.classList.add('highlight-search');
-                        } else {
-                            node.classList.remove('highlight-search');
-                        }
-                    });
-                });
-            }
-
-            // Zoom & Control Buttons
-            const zoomInBtn = document.getElementById('zoomInBtn');
-            if (zoomInBtn) zoomInBtn.addEventListener('click', () => {
-                zoomScale = Math.min(2.5, zoomScale * 1.15);
-                updateTransform();
-            });
-
-            const zoomOutBtn = document.getElementById('zoomOutBtn');
-            if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => {
-                zoomScale = Math.max(0.2, zoomScale / 1.15);
-                updateTransform();
-            });
-
-            const resetViewBtn = document.getElementById('resetViewBtn');
-            if (resetViewBtn) {
-                resetViewBtn.addEventListener('click', () => {
-                    zoomScale = 0.85;
-                    panX = 40;
-                    panY = 20;
-                    updateTransform();
-                });
-            }
-
-            const undoBtn = document.getElementById('undoBtn');
-            if (undoBtn) undoBtn.addEventListener('click', undo);
-
-            const redoBtn = document.getElementById('redoBtn');
-            if (redoBtn) redoBtn.addEventListener('click', redo);
-
-            const saveManualBtn = document.getElementById('saveManualBtn');
-            if (saveManualBtn) saveManualBtn.addEventListener('click', autoSaveToLocalStorage);
-
-            const connectModeBtn = document.getElementById('connectModeBtn');
-            if (connectModeBtn) connectModeBtn.addEventListener('click', toggleConnectMode);
-
-            const cancelConnectBtn = document.getElementById('cancelConnectBtn');
-            if (cancelConnectBtn) cancelConnectBtn.addEventListener('click', toggleConnectMode);
-
-            const addNodeBtn = document.getElementById('addNodeBtn');
-            if (addNodeBtn) addNodeBtn.addEventListener('click', () => openEditModal(null));
-
-            const closeModalBtn = document.getElementById('closeModalBtn');
-            if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-
-            const cancelModalBtn = document.getElementById('cancelModalBtn');
-            if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
-
-            const resetLayoutBtn = document.getElementById('resetLayoutBtn');
-            if (resetLayoutBtn) {
-                resetLayoutBtn.addEventListener('click', () => {
-                    if (confirm("Reset ulang ke struktur default asli? Semua perubahan posisi dan edit personil custom Anda akan dikembalikan.")) {
-                        saveStateToHistory();
-                        localStorage.removeItem(STORAGE_KEY);
-                        orgData = JSON.parse(JSON.stringify(defaultOrgData));
-                        renderNodes();
-                        autoSaveToLocalStorage();
-                    }
-                });
-            }
-
-            const exportPngBtn = document.getElementById('exportPngBtn');
-            if (exportPngBtn) exportPngBtn.addEventListener('click', exportChartToPng);
-
-            renderNodes();
+        function zoomIn() {
+            scale = Math.min(scale * 1.15, 2.0);
             updateTransform();
+            updateZoomLabel();
         }
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initApp);
-        } else {
-            initApp();
+        function zoomOut() {
+            scale = Math.max(scale / 1.15, 0.25);
+            updateTransform();
+            updateZoomLabel();
         }
+
+        function resetZoom() {
+            scale = 0.55;
+            panX = 400;
+            panY = 100;
+            updateTransform();
+            updateZoomLabel();
+        }
+
+        // Modal Form Handling
+        function populatePositionDropdown(selectedPos = '') {
+            const selectEl = document.getElementById('input-position-select');
+            const customInput = document.getElementById('input-position-custom');
+            
+            const positions = [...new Set(nodes.map(n => n.position))].sort();
+            
+            selectEl.innerHTML = `
+                <option value="">-- Pilih Posisi yang Ada --</option>
+                ${positions.map(p => `<option value="${p}" ${p === selectedPos ? 'selected' : ''}>${p}</option>`).join('')}
+                <option value="__new__">+ Tambah Posisi Baru...</option>
+            `;
+
+            if (selectedPos && !positions.includes(selectedPos)) {
+                selectEl.value = '__new__';
+                customInput.value = selectedPos;
+                customInput.classList.remove('hidden');
+            } else {
+                customInput.classList.add('hidden');
+                customInput.value = '';
+            }
+        }
+
+        function handlePositionSelectChange(select) {
+            const customInput = document.getElementById('input-position-custom');
+            if (select.value === '__new__') {
+                customInput.classList.remove('hidden');
+                customInput.focus();
+                customInput.value = '';
+            } else {
+                customInput.classList.add('hidden');
+            }
+        }
+
+        function populateManagerDropdown(currentId = null, selectedManager = '') {
+            const managerSelect = document.getElementById('input-manager');
+            managerSelect.innerHTML = `<option value="">-- Tidak Ada (Top Level / C-Level) --</option>`;
+            
+            nodes.forEach(n => {
+                if (n.id !== currentId) {
+                    managerSelect.innerHTML += `<option value="${n.id}" ${n.id === selectedManager ? 'selected' : ''}>${n.name} (${n.position})</option>`;
+                }
+            });
+        }
+
+        function autoFormatName(input) {
+            let val = input.value;
+            // Title Case: Capitalize first letter of each word
+            val = val.replace(/\b\w/g, l => l.toUpperCase());
+            input.value = val;
+        }
+
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = "Tambah Personil Baru";
+            document.getElementById('edit-node-id').value = "";
+            document.getElementById('input-name').value = "";
+            populatePositionDropdown();
+            populateManagerDropdown();
+            document.getElementById('input-level').value = "junior";
+            document.getElementById('person-modal').classList.remove('hidden');
+        }
+
+        function openEditModal(id) {
+            const node = nodes.find(n => n.id === id);
+            if (!node) return;
+
+            document.getElementById('modal-title').textContent = "Edit Personil";
+            document.getElementById('edit-node-id').value = node.id;
+            document.getElementById('input-name').value = node.name;
+            populatePositionDropdown(node.position);
+            populateManagerDropdown(node.id, node.manager);
+            document.getElementById('input-level').value = node.level;
+            document.getElementById('person-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('person-modal').classList.add('hidden');
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-node-id').value;
+            const name = document.getElementById('input-name').value.trim();
+            
+            let position = document.getElementById('input-position-select').value;
+            if (position === '__new__') {
+                position = document.getElementById('input-position-custom').value.trim();
+            }
+
+            const manager = document.getElementById('input-manager').value;
+            const level = document.getElementById('input-level').value;
+
+            if (!name || !position) return;
+
+            let color = 'blue';
+            if (level === 'bod') color = 'slate';
+            else if (level === 'manager') color = 'indigo';
+            else if (level === 'senior') color = 'blue';
+            else if (level === 'junior') color = 'emerald';
+            else if (level === 'probation') color = 'amber';
+
+            // Automatic Y positioning based on level center
+            const targetY = levelYMap[level] || 1060;
+
+            if (editId) {
+                const node = nodes.find(n => n.id === editId);
+                if (node) {
+                    node.name = name;
+                    node.position = position;
+                    node.manager = manager;
+                    node.level = level;
+                    node.color = color;
+                    node.y = targetY; // snap to level area
+                }
+                saveState("Edit Personil");
+            } else {
+                const newId = 'node_' + Date.now();
+                // Find manager X to place nearby or default center
+                let newX = 2000;
+                if (manager) {
+                    const mgrNode = nodes.find(n => n.id === manager);
+                    if (mgrNode) newX = mgrNode.x;
+                }
+                nodes.push({
+                    id: newId,
+                    name: name,
+                    position: position,
+                    manager: manager,
+                    level: level,
+                    x: newX,
+                    y: targetY,
+                    color: color
+                });
+                saveState("Tambah Personil");
+            }
+
+            closeModal();
+            renderNodes();
+            updateConnectors();
+        }
+
+        function deleteNode(id) {
+            if (confirm("Apakah Anda yakin ingin menghapus personil ini?")) {
+                nodes = nodes.filter(n => n.id !== id && n.manager !== id);
+                saveState("Hapus Personil");
+                renderNodes();
+                updateConnectors();
+            }
+        }
+
+        // High Resolution PNG Export (Clean & Margin Safe)
+        function exportToPNG() {
+            // Find bounds of all nodes
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(n => {
+                minX = Math.min(minX, n.x);
+                minY = Math.min(minY, n.y);
+                maxX = Math.max(maxX, n.x + 256);
+                maxY = Math.max(maxY, n.y + 85);
+            });
+
+            const padding = 120;
+            const exportWidth = (maxX - minX) + padding * 2;
+            const exportHeight = (maxY - minY) + padding * 2;
+            const offsetX = minX - padding;
+            const offsetY = minY - padding;
+
+            const svgString = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="${offsetX} ${offsetY} ${exportWidth} ${exportHeight}">
+                    <defs>
+                        <style>
+                            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+                            * { font-family: 'Inter', sans-serif; }
+                        </style>
+                    </defs>
+                    <!-- Background -->
+                    <rect x="${offsetX}" y="${offsetY}" width="${exportWidth}" height="${exportHeight}" fill="#f8fafc" />
+                    
+                    <!-- Swimlane Backgrounds & Side Labels -->
+                    ${Object.keys(levelYMap).map(lvl => {
+                        const yCenter = levelYMap[lvl];
+                        const laneTop = yCenter - 80;
+                        const laneHeight = 500;
+                        let badgeBg = '#1e293b';
+                        let labelText = 'LEVEL BOD';
+                        if(lvl==='manager') { badgeBg='#4f46e5'; labelText='LEVEL MANAGER'; }
+                        else if(lvl==='senior') { badgeBg='#2563eb'; labelText='LEVEL SENIOR'; }
+                        else if(lvl==='junior') { badgeBg='#059669'; labelText='LEVEL JUNIOR'; }
+                        else if(lvl==='probation') { badgeBg='#d97706'; labelText='LEVEL PROBATION'; }
+
+                        return `
+                            <rect x="${offsetX}" y="${laneTop}" width="${exportWidth}" height="${laneHeight}" fill="${lvl==='bod'?'#e2e8f0':lvl==='manager'?'#e0e7ff':lvl==='senior'?'#dbeafe':'#ecfdf5'}" opacity="0.25" />
+                            <line x1="${offsetX}" y1="${laneTop+laneHeight}" x2="${offsetX+exportWidth}" y2="${laneTop+laneHeight}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+                            <!-- Side Level Badge placed safely outside / left margin so it never overlaps nodes -->
+                            <g transform="translate(${offsetX + 20}, ${yCenter - 20})">
+                                <rect width="130" height="32" rx="6" fill="${badgeBg}" />
+                                <text x="15" y="21" fill="#ffffff" font-size="11" font-weight="700" letter-spacing="0.5">${labelText}</text>
+                            </g>
+                        `;
+                    }).join('')}
+
+                    <!-- Connectors -->
+                    ${svgContainer.innerHTML}
+
+                    <!-- Nodes -->
+                    ${nodes.map(n => {
+                        let badgeBg = '#f1f5f9', badgeText = '#334155', badgeBorder = '#cbd5e1';
+                        if (n.level === 'bod') { badgeBg = '#0f172a'; badgeText = '#ffffff'; badgeBorder = '#0f172a'; }
+                        else if (n.level === 'manager') { badgeBg = '#e0e7ff'; badgeText = '#4f46e5'; badgeBorder = '#c7d2fe'; }
+                        else if (n.level === 'senior') { badgeBg = '#dbeafe'; badgeText = '#2563eb'; badgeBorder = '#bfdbfe'; }
+                        else if (n.level === 'junior') { badgeBg = '#ecfdf5'; badgeText = '#059669'; badgeBorder = '#a7f3d0'; }
+                        else if (n.level === 'probation') { badgeBg = '#fef3c7'; badgeText = '#d97706'; badgeBorder = '#fde68a'; }
+
+                        return `
+                            <g transform="translate(${n.x}, ${n.y})">
+                                <rect width="256" height="85" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" filter="drop-shadow(0 4px 6px rgb(0 0 / 0.05))" />
+                                <rect x="16" y="14" width="72" height="20" rx="4" fill="${badgeBg}" stroke="${badgeBorder}" />
+                                <text x="24" y="28" fill="${badgeText}" font-size="9" font-weight="700" letter-spacing="0.5">${n.level.toUpperCase()}</text>
+                                <text x="16" y="52" fill="#0f172a" font-size="13" font-weight="700">${n.name}</text>
+                                <text x="16" y="69" fill="#64748b" font-size="11" font-weight="500">${n.position}</text>
+                            </g>
+                        `;
+                    }).join('')}
+                </svg>
+            `;
+
+            const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = function() {
+                const canvasEl = document.createElement('canvas');
+                const scaleFactor = 2; // Retina Scale
+                canvasEl.width = exportWidth * scaleFactor;
+                canvasEl.height = exportHeight * scaleFactor;
+                const ctx = canvasEl.getContext('2d');
+                ctx.scale(scaleFactor, scaleFactor);
+                ctx.drawImage(img, 0, 0);
+
+                const link = document.createElement('a');
+                link.download = 'Struktur_Organisasi_PT_STK.png';
+                link.href = canvasEl.toDataURL('image/png');
+                link.click();
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+
+        // Run Init on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            updateTransform();
+        });
     </script>
 </body>
 </html>
