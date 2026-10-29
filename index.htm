@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<!-- saved from url=(0050)https://martinhendrawan29.github.io/stk-org-chart/ -->
+<html lang="id"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STK Organization Chart</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="./STK Organization Chart_files/saved_resource"></script>
+    <!-- Lucide Icons -->
+    <script src="./STK Organization Chart_files/lucide@latest"></script>
+    <!-- Font Family Inter -->
+    <link href="./STK Organization Chart_files/css2" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* Viewport Container */
+        #viewport {
+            width: 100vw;
+            height: calc(100vh - 61px);
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+            background-color: #f8fafc;
+        }
+
+        #viewport.grabbing {
+            cursor: grabbing;
+        }
+
+        /* Pan & Zoom Transformer Layer */
+        #chartTransformer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            will-change: transform;
+        }
+
+        /* Interactive Canvas Grid */
+        #chartArea {
+            position: relative;
+            width: 4500px;
+            height: 2500px;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+            background-size: 24px 24px;
+        }
+
+        /* Level Swimlanes */
+        .swimlane {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            border-bottom: 2px dashed #cbd5e1;
+            pointer-events: none;
+            display: flex;
+            align-items: flex-start;
+            z-index: 1;
+        }
+
+        .swimlane-label {
+            position: sticky;
+            left: 20px;
+            top: 10px;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            z-index: 5;
+            pointer-events: auto;
+        }
+
+        /* SVG Overlay for Connectors */
+        #svgConnectors {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Uniform Node Styling */
+        .org-node {
+            position: absolute;
+            width: 210px;
+            height: 64px;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+            padding: 6px 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            cursor: move;
+            z-index: 10;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .org-node:hover {
+            border-color: #6366f1;
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.2);
+        }
+
+        .org-node.dragging {
+            z-index: 50;
+            opacity: 0.95;
+            border-color: #4f46e5;
+            box-shadow: 0 15px 25px -5px rgba(79, 70, 229, 0.3);
+            transition: none !important;
+        }
+
+        .org-node.selected-child {
+            outline: 3px solid #ef4444 !important;
+            border-color: #ef4444;
+        }
+
+        .org-node.multi-selected {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4) !important;
+            background-color: #f0fdf4;
+        }
+
+        .org-node.target-parent {
+            outline: 3px dashed #10b981 !important;
+            animation: pulse-border 1s infinite;
+        }
+
+        /* Selection Box Overlay */
+        #selectionBox {
+            position: absolute;
+            border: 1.5px dashed #6366f1;
+            background-color: rgba(99, 102, 241, 0.12);
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+            border-radius: 4px;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: #10b981; }
+            50% { border-color: #059669; }
+        }
+
+        /* Visual Department Themes */
+        .node-bod {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #ffffff;
+            border-color: #334155;
+        }
+        .node-bod .node-title { color: #94a3b8; }
+
+        .node-manager { border-left: 5px solid #8b5cf6; }
+        .node-pm { border-left: 5px solid #f59e0b; }
+        .node-sm { border-left: 5px solid #10b981; }
+        .node-staff { border-left: 5px solid #3b82f6; }
+        .node-vacant {
+            border: 1.5px dashed #f59e0b;
+            background-color: #fffbe8;
+        }
+
+        .highlight-search {
+            outline: 3px solid #6366f1 !important;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
+
+        /* Action Buttons on Node Hover */
+        .node-actions {
+            display: none;
+            position: absolute;
+            top: -12px;
+            right: 8px;
+            gap: 4px;
+            z-index: 20;
+        }
+
+        .org-node:hover .node-actions {
+            display: flex;
+        }
+    </style>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.left-3{left:0.75rem}.top-1\/2{top:50%}.z-30{z-index:30}.z-50{z-index:50}.mb-1{margin-bottom:0.25rem}.ml-1{margin-left:0.25rem}.ml-2{margin-left:0.5rem}.mt-0\.5{margin-top:0.125rem}.mt-2{margin-top:0.5rem}.block{display:block}.flex{display:flex}.inline-flex{display:inline-flex}.hidden{display:none}.h-3{height:0.75rem}.h-3\.5{height:0.875rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-screen{height:100vh}.w-3{width:0.75rem}.w-3\.5{width:0.875rem}.w-4{width:1rem}.w-44{width:11rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-full{width:100%}.min-w-\[45px\]{min-width:45px}.max-w-md{max-width:28rem}.max-w-full{max-width:100%}.-translate-y-1\/2{--tw-translate-y:-50%;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@keyframes pulse{50%{opacity:.5}}.animate-pulse{animation:pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.gap-1\.5{gap:0.375rem}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-4{gap:1rem}.space-x-3 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.75rem * var(--tw-space-x-reverse));margin-left:calc(0.75rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-md{border-radius:0.375rem}.rounded-xl{border-radius:0.75rem}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-l{border-left-width:1px}.border-amber-300{--tw-border-opacity:1;border-color:rgb(252 211 77 / var(--tw-border-opacity, 1))}.border-emerald-200{--tw-border-opacity:1;border-color:rgb(167 243 208 / var(--tw-border-opacity, 1))}.border-red-200{--tw-border-opacity:1;border-color:rgb(254 202 202 / var(--tw-border-opacity, 1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240 / var(--tw-border-opacity, 1))}.border-slate-300{--tw-border-opacity:1;border-color:rgb(203 213 225 / var(--tw-border-opacity, 1))}.bg-amber-50{--tw-bg-opacity:1;background-color:rgb(255 251 235 / var(--tw-bg-opacity, 1))}.bg-emerald-50{--tw-bg-opacity:1;background-color:rgb(236 253 245 / var(--tw-bg-opacity, 1))}.bg-indigo-600{--tw-bg-opacity:1;background-color:rgb(79 70 229 / var(--tw-bg-opacity, 1))}.bg-red-50{--tw-bg-opacity:1;background-color:rgb(254 242 242 / var(--tw-bg-opacity, 1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252 / var(--tw-bg-opacity, 1))}.bg-slate-900\/40{background-color:rgb(15 23 42 / 0.4)}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.p-1{padding:0.25rem}.p-1\.5{padding:0.375rem}.p-2{padding:0.5rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-2\.5{padding-left:0.625rem;padding-right:0.625rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-0\.5{padding-top:0.125rem;padding-bottom:0.125rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.pl-9{padding-left:2.25rem}.pr-3{padding-right:0.75rem}.pt-2{padding-top:0.5rem}.text-center{text-align:center}.text-\[11px\]{font-size:11px}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xs{font-size:0.75rem;line-height:1rem}.text-\[10px\]{font-size:10px}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.capitalize{text-transform:capitalize}.leading-none{line-height:1}.tracking-tight{letter-spacing:-0.025em}.text-amber-800{--tw-text-opacity:1;color:rgb(146 64 14 / var(--tw-text-opacity, 1))}.text-amber-900{--tw-text-opacity:1;color:rgb(120 53 15 / var(--tw-text-opacity, 1))}.text-emerald-600{--tw-text-opacity:1;color:rgb(5 150 105 / var(--tw-text-opacity, 1))}.text-indigo-600{--tw-text-opacity:1;color:rgb(79 70 229 / var(--tw-text-opacity, 1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity, 1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184 / var(--tw-text-opacity, 1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139 / var(--tw-text-opacity, 1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85 / var(--tw-text-opacity, 1))}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59 / var(--tw-text-opacity, 1))}.text-slate-900{--tw-text-opacity:1;color:rgb(15 23 42 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.underline{-webkit-text-decoration-line:underline;text-decoration-line:underline}.opacity-80{opacity:0.8}.shadow{--tw-shadow:0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition{transition-property:color, background-color, border-color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-text-decoration-color, -webkit-backdrop-filter;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-text-decoration-color, -webkit-backdrop-filter;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.hover\:bg-indigo-700:hover{--tw-bg-opacity:1;background-color:rgb(67 56 202 / var(--tw-bg-opacity, 1))}.hover\:bg-red-100:hover{--tw-bg-opacity:1;background-color:rgb(254 226 226 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-200:hover{--tw-bg-opacity:1;background-color:rgb(226 232 240 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252 / var(--tw-bg-opacity, 1))}.hover\:bg-white:hover{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.hover\:text-black:hover{--tw-text-opacity:1;color:rgb(0 0 0 / var(--tw-text-opacity, 1))}.hover\:text-slate-600:hover{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.focus\:border-indigo-500:focus{--tw-border-opacity:1;border-color:rgb(99 102 241 / var(--tw-border-opacity, 1))}.focus\:bg-white:focus{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}</style></head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-800">
+
+    <!-- HEADER / TOOLBAR -->
+    <header class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap justify-between items-center z-30 shadow-sm gap-4">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="network" aria-hidden="true" class="lucide lucide-network w-6 h-6"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></svg>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-lg text-slate-900 tracking-tight leading-none">STK Organization Chart</h1>
+                    <span id="saveStatus" class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" aria-hidden="true" class="lucide lucide-check w-3 h-3"><path d="M20 6 9 17l-5-5"></path></svg> Tersimpan Otomatis</span>
+                </div>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">Bagan Struktur Organisasi - Auto-Snap Levels &amp; High-Res Export</p>
+            </div>
+        </div>
+
+        <!-- Mode Indicator / Banner -->
+        <div id="connectBanner" class="hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 animate-pulse">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="link" aria-hidden="true" class="lucide lucide-link w-4 h-4"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span id="connectBannerText">Langkah 1: Klik Kotak Bawahan (Child Node)</span>
+            <button id="cancelConnectBtn" class="text-amber-900 underline hover:text-black ml-2 text-[11px]">Batal</button>
+        </div>
+
+        <div class="flex items-center flex-wrap gap-3">
+            <!-- Search -->
+            <div class="relative w-44">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="search" aria-hidden="true" class="lucide lucide-search w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
+                <input type="text" id="searchInput" placeholder="Cari nama / posisi..." class="w-full pl-9 pr-3 py-1.5 bg-slate-100 text-slate-800 text-xs rounded-lg border border-slate-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition">
+            </div>
+
+            <!-- Zoom Controls -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+                <button id="zoomOutBtn" title="Zoom Out (-)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="zoom-out" aria-hidden="true" class="lucide lucide-zoom-out w-4 h-4"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg>
+                </button>
+                <span id="zoomLevelText" class="px-2 text-slate-600 min-w-[45px] text-center">50%</span>
+                <button id="zoomInBtn" title="Zoom In (+)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="zoom-in" aria-hidden="true" class="lucide lucide-zoom-in w-4 h-4"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="11" x2="11" y1="8" y2="14"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg>
+                </button>
+                <button id="resetViewBtn" title="Reset Pandangan / Center" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm ml-1 border-l border-slate-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="maximize-2" aria-hidden="true" class="lucide lucide-maximize-2 w-4 h-4"><path d="M15 3h6v6"></path><path d="m21 3-7 7"></path><path d="m3 21 7-7"></path><path d="M9 21H3v-6"></path></svg>
+                </button>
+            </div>
+
+            <!-- Toolbar Controls -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
+                <button id="undoBtn" title="Undo Langkah (Cmd+Z / Ctrl+Z)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="undo-2" aria-hidden="true" class="lucide lucide-undo-2 w-3.5 h-3.5 text-slate-600"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"></path></svg> Undo
+                </button>
+                <button id="redoBtn" title="Redo Langkah (Cmd+Shift+Z / Ctrl+Y)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="redo-2" aria-hidden="true" class="lucide lucide-redo-2 w-3.5 h-3.5 text-slate-600"><path d="m15 14 5-5-5-5"></path><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"></path></svg> Redo
+                </button>
+                <button id="connectModeBtn" title="Ubah Relasi Pelaporan / Konektor" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="git-fork" aria-hidden="true" class="lucide lucide-git-fork w-3.5 h-3.5 text-indigo-600"><circle cx="12" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"></path><path d="M12 12v3"></path></svg> Ubah Atasan
+                </button>
+                <button id="addNodeBtn" title="Tambah Personil Baru" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="user-plus" aria-hidden="true" class="lucide lucide-user-plus w-3.5 h-3.5 text-indigo-600"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" x2="19" y1="8" y2="14"></line><line x1="22" x2="16" y1="11" y2="11"></line></svg> Tambah Node
+                </button>
+                <button id="exportPngBtn" title="Unduh Gambar PNG" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="download" aria-hidden="true" class="lucide lucide-download w-3.5 h-3.5"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg> Export PNG
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN VIEWPORT CANVAS WITH TRANSFORMER -->
+    <main id="viewport" class="">
+        <div id="chartTransformer" style="transform: translate(215.811px, 100.705px) scale(0.495967);">
+            <div id="chartArea">
+                <!-- Swimlanes Background -->
+                <div id="swimlanesContainer"><div class="swimlane" style="top: 40px; height: 180px; background-color: rgba(241, 245, 249, 0.5);">
+                    <div class="swimlane-label" style="background-color: #0f172a; color: #ffffff;">
+                        LEVEL BOD
+                    </div>
+                </div><div class="swimlane" style="top: 220px; height: 200px; background-color: rgba(255, 255, 255, 0.3);">
+                    <div class="swimlane-label" style="background-color: #8b5cf6; color: #ffffff;">
+                        LEVEL MANAGER
+                    </div>
+                </div><div class="swimlane" style="top: 420px; height: 200px; background-color: rgba(241, 245, 249, 0.5);">
+                    <div class="swimlane-label" style="background-color: #0284c7; color: #ffffff;">
+                        LEVEL SENIOR STAFF
+                    </div>
+                </div><div class="swimlane" style="top: 620px; height: 200px; background-color: rgba(255, 255, 255, 0.3);">
+                    <div class="swimlane-label" style="background-color: #10b981; color: #ffffff;">
+                        LEVEL JUNIOR STAFF
+                    </div>
+                </div><div class="swimlane" style="top: 820px; height: 200px; background-color: rgba(241, 245, 249, 0.5);">
+                    <div class="swimlane-label" style="background-color: #64748b; color: #ffffff;">
+                        LEVEL PROBATION
+                    </div>
+                </div></div>
+
+                <!-- SVG Connectors Canvas -->
+                <svg id="svgConnectors">
+                <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"></path>
+                    </marker>
+                </defs>
+                <path d="M 389.525622043312 164 L 389.525622043312 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 389.525622043312 354 L 390.98507438111704 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 980.0558470625883 164 L 980.0558470625883 194" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 775 194 L 1185.4677363576777 194" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 775 194 L 775 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1024.8183320530256 194 L 1024.8183320530256 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1185.4677363576777 194 L 1185.4677363576777 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1185.4677363576777 554 L 1187.2716372039333 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 775 354 L 775 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 655 384 L 905 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 655 384 L 655 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 905 384 L 905 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 774.779468120071 384 L 774.779468120071 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2719.2422471039226 164 L 2719.2422471039226 194" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 1679.2863616288698 194 L 3921.210741665969 194" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 1679.2863616288698 194 L 1679.2863616288698 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2487.2351316948757 194 L 2487.2351316948757 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2988.6591207077513 194 L 2988.6591207077513 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 3921.210741665969 194 L 3921.210741665969 290" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1679.2863616288698 354 L 1679.2863616288698 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 1450.4081116340828 384 L 1905.7572410292569 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 1450.4081116340828 384 L 1450.4081116340828 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1679.542128669475 384 L 1679.542128669475 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1905.7572410292569 384 L 1905.7572410292569 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1450.4081116340828 554 L 1449.6767501142908 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 1679.542128669475 554 L 1679.6667889496473 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2487.2351316948757 354 L 2487.2351316948757 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 2146.5018019279705 384 L 2832.641188630935 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 2146.5018019279705 384 L 2146.5018019279705 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2375.854700178493 384 L 2375.854700178493 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2604.8644989052423 384 L 2604.8644989052423 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2832.641188630935 384 L 2832.641188630935 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2146.5018019279705 554 L 2148.1936254555426 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2988.6591207077513 354 L 2988.6591207077513 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 2988.6591207077513 384 L 3567.89009530154 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 3110.1841581520994 384 L 3110.1841581520994 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 3340.407503784153 384 L 3340.407503784153 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 3567.89009530154 384 L 3567.89009530154 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2988.6591207077513 384 L 2988.6591207077513 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 3921.210741665969 354 L 3921.210741665969 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 3812.307601856087 384 L 4032.8286779222185 384" stroke="#64748b" stroke-width="2" fill="none"></path><path d="M 3812.307601856087 384 L 3812.307601856087 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 4032.8286779222185 384 L 4032.8286779222185 490" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 3812.307601856087 554 L 3812.307601856087 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2604.8644989052423 554 L 2605.1534520624277 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path><path d="M 2375.854700178493 554 L 2376.3004834877074 690" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"></path>
+            </svg>
+
+                <!-- Area Selection Box -->
+                <div id="selectionBox" style="left: 258.873px; top: 17.9802px; width: 179.777px; height: 751.95px; display: none;"></div>
+
+                <!-- NODES CONTAINER -->
+                <div id="nodesContainer"><div id="node-ceo" class="org-node node-bod" data-name="erwin suryawangi" data-title="ceo" style="left: 284.526px; top: 100px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;ceo&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Erwin Suryawangi</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">CEO</div>
+                </div><div id="node-cfo" class="org-node node-bod" data-name="ivan sutanto" data-title="cfo" style="left: 875.056px; top: 100px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;cfo&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Ivan Sutanto</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">CFO</div>
+                </div><div id="node-coo" class="org-node node-bod" data-name="budi setiawan" data-title="coo" style="left: 2614.24px; top: 100px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;coo&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Budi Setiawan</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">COO</div>
+                </div><div id="node-sales_mgr" class="org-node node-manager" data-name="martin hendrawan" data-title="sales &amp; marketing manager" style="left: 284.526px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sales_mgr&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Martin Hendrawan</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Sales &amp; Marketing Manager</div>
+                </div><div id="node-csm_spec" class="org-node node-staff" data-name="lahana nirwanda artami" data-title="community &amp; social media spec." style="left: 285.985px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;csm_spec&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Lahana Nirwanda Artami</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Community &amp; Social Media Spec.</div>
+                </div><div id="node-fin_mgr" class="org-node node-manager" data-name="siti romlah" data-title="finance manager" style="left: 670px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;fin_mgr&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Siti Romlah</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Finance Manager</div>
+                </div><div id="node-hr_mgr" class="org-node node-manager" data-name="dewi ariyani" data-title="hrga manager" style="left: 919.818px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;hr_mgr&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Dewi Ariyani</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">HRGA Manager</div>
+                </div><div id="node-qs_vacant" class="org-node node-vacant" data-name="qs (vacant)" data-title="quantity surveyor" style="left: 1080.47px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;qs_vacant&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">QS (Vacant)</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Quantity Surveyor</div>
+                </div><div id="node-estimator_staff" class="org-node node-staff" data-name="indah fitria rahami" data-title="estimator staff" style="left: 1082.27px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;estimator_staff&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Indah Fitria Rahami</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Estimator Staff</div>
+                </div><div id="node-fin_staff" class="org-node node-staff" data-name="rahma virani lintang utomo" data-title="finance &amp; acct staff" style="left: 550px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;fin_staff&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Rahma Virani Lintang Utomo</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Finance &amp; Acct Staff</div>
+                </div><div id="node-sr_purchasing" class="org-node node-staff" data-name="putri natasya" data-title="senior purchasing" style="left: 800px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sr_purchasing&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Putri Natasya</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Senior Purchasing</div>
+                </div><div id="node-purchasing_staff" class="org-node node-staff" data-name="siti mayrina nurazizah" data-title="purchasing staff" style="left: 669.779px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;purchasing_staff&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Siti Mayrina Nurazizah</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Purchasing Staff</div>
+                </div><div id="node-pm_arif" class="org-node node-pm" data-name="arif saifurrochim" data-title="project manager" style="left: 1574.29px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pm_arif&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Arif Saifurrochim</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Project Manager</div>
+                </div><div id="node-sm_helmy" class="org-node node-sm" data-name="helmy setiawan" data-title="site manager" style="left: 1345.41px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_helmy&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Helmy Setiawan</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-sm_imam" class="org-node node-sm" data-name="imam yuddi p" data-title="site manager" style="left: 1574.54px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_imam&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Imam Yuddi P</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-pc_khoirus" class="org-node node-staff" data-name="khoirus syahira" data-title="project coordinator" style="left: 1800.76px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pc_khoirus&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Khoirus Syahira</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Project Coordinator</div>
+                </div><div id="node-log_zulkifli" class="org-node node-staff" data-name="zulkifli" data-title="logistic staff" style="left: 1344.68px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;log_zulkifli&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Zulkifli</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div><div id="node-log_yasin" class="org-node node-staff" data-name="yasin muchamad ilham" data-title="logistic staff" style="left: 1574.67px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;log_yasin&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Yasin Muchamad Ilham</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div><div id="node-pm_reza" class="org-node node-pm" data-name="muhammad reza pahlevi h." data-title="project manager" style="left: 2382.24px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pm_reza&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Muhammad Reza Pahlevi H.</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Project Manager</div>
+                </div><div id="node-sm_trias" class="org-node node-sm" data-name="trias kusuma nugraha" data-title="site manager" style="left: 2041.5px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_trias&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Trias Kusuma Nugraha</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-sm_barkah" class="org-node node-sm" data-name="barkah tri abdi" data-title="site manager" style="left: 2270.85px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_barkah&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Barkah Tri Abdi</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-sm_denny" class="org-node node-sm" data-name="denny fitrianto saidi" data-title="site manager" style="left: 2499.86px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_denny&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Denny Fitrianto Saidi</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-pc_ayufy" class="org-node node-staff" data-name="ayufy riska helmida" data-title="project coordinator" style="left: 2727.64px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pc_ayufy&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Ayufy Riska Helmida</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Project Coordinator</div>
+                </div><div id="node-log_tri" class="org-node node-staff" data-name="tri aditya setiawan" data-title="logistic staff" style="left: 2043.19px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;log_tri&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Tri Aditya Setiawan</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div><div id="node-pm_toni" class="org-node node-pm" data-name="toni oki pratama" data-title="jr project manager" style="left: 2883.66px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pm_toni&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Toni Oki Pratama</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Jr Project Manager</div>
+                </div><div id="node-sm_idris" class="org-node node-sm" data-name="idris albawavi" data-title="site manager" style="left: 3005.18px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_idris&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Idris Albawavi</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-sm_ismawan" class="org-node node-sm" data-name="ismawan adhi ramadhan" data-title="site manager" style="left: 3235.41px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_ismawan&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Ismawan Adhi Ramadhan</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-pc_rahma" class="org-node node-staff" data-name="rahma dwi nur hijriah" data-title="project coordinator" style="left: 3462.89px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pc_rahma&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Rahma Dwi Nur Hijriah</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Project Coordinator</div>
+                </div><div id="node-log_hanif" class="org-node node-staff" data-name="muhammad hanif" data-title="logistic staff" style="left: 2883.66px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;log_hanif&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Muhammad Hanif</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div><div id="node-pm_sutopo" class="org-node node-pm" data-name="sutopo" data-title="senior site manager" style="left: 3816.21px; top: 290px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pm_sutopo&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Sutopo</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Senior Site Manager</div>
+                </div><div id="node-sm_reza_a" class="org-node node-sm" data-name="reza afrilianto" data-title="site manager" style="left: 3707.31px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;sm_reza_a&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Reza Afrilianto</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Site Manager</div>
+                </div><div id="node-pc_anik" class="org-node node-staff" data-name="anik purmiati" data-title="project coordinator" style="left: 3927.83px; top: 490px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;pc_anik&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Anik Purmiati</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Project Coordinator</div>
+                </div><div id="node-log_ian" class="org-node node-staff" data-name="ian setiawan" data-title="logistic staff" style="left: 3707.31px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;log_ian&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Ian Setiawan</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div><div id="node-node_1793261616885" class="org-node node-junior_staff" data-name="tomy rizki gumilar" data-title="logistic staff" style="left: 2500.15px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;node_1793261616885&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Tomy Rizki Gumilar</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div><div id="node-node_1793261642469" class="org-node node-junior_staff" data-name="agung satryo leksono" data-title="logistic staff" style="left: 2271.3px; top: 690px;">
+                    <div class="node-actions">
+                        <button onclick="openEditModal(&#39;node_1793261642469&#39;)" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="pencil" aria-hidden="true" class="lucide lucide-pencil w-3 h-3"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">Agung Satryo Leksono</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">Logistic Staff</div>
+                </div></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- EDIT / ADD NODE MODAL -->
+    <div id="nodeModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h3 id="modalTitle" class="font-bold text-slate-800 text-sm">Edit Data Personil</h3>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="x" aria-hidden="true" class="lucide lucide-x w-5 h-5"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+            </div>
+            <form id="nodeForm" class="p-6 space-y-4">
+                <input type="hidden" id="modalNodeId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Lengkap</label>
+                    <input type="text" id="modalName" required="" placeholder="Contoh: Budi Setiawan" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 capitalize">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Jabatan / Posisi</label>
+                    <select id="modalTitleSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                        <!-- Populated dynamically -->
+                    </select>
+                    <input type="text" id="modalCustomTitleInput" placeholder="Ketik nama posisi baru..." class="w-full px-3 py-2 mt-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 hidden">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Atasan Direct (Report To)</label>
+                    <select id="modalParentSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="">-- Tidak Ada (Top Level / C-Level) --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Tipe Level Area</label>
+                    <select id="modalTypeSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="bod">Level BOD</option>
+                        <option value="manager">Level Manager</option>
+                        <option value="senior_staff">Level Senior Staff</option>
+                        <option value="junior_staff">Level Junior Staff</option>
+                        <option value="probation">Level Probation</option>
+                    </select>
+                </div>
+                <div class="pt-2 flex justify-between items-center gap-2">
+                    <button type="button" id="deleteNodeBtn" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="trash-2" aria-hidden="true" class="lucide lucide-trash-2 w-4 h-4"><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Hapus Node
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" id="cancelModalBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow">Simpan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        if (window.lucide) lucide.createIcons();
+
+        // LocalStorage Key
+        const STORAGE_KEY = 'STK_ORG_CHART_DATA_V3';
+
+        // Swimlane Heights & Centers Definition
+        const LEVEL_ZONES = [
+            { id: "bod", name: "LEVEL BOD", top: 40, height: 180, centerY: 100, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0f172a", labelColor: "#ffffff" },
+            { id: "manager", name: "LEVEL MANAGER", top: 220, height: 200, centerY: 290, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#8b5cf6", labelColor: "#ffffff" },
+            { id: "senior_staff", name: "LEVEL SENIOR STAFF", top: 420, height: 200, centerY: 490, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0284c7", labelColor: "#ffffff" },
+            { id: "junior_staff", name: "LEVEL JUNIOR STAFF", top: 620, height: 200, centerY: 690, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#10b981", labelColor: "#ffffff" },
+            { id: "probation", name: "LEVEL PROBATION", top: 820, height: 200, centerY: 890, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#64748b", labelColor: "#ffffff" }
+        ];
+
+        // Initial Organogram Data Structure aligned with Swimlane Center Y-values
+        const defaultOrgData = [
+            // C-LEVEL (BOD)
+            { id: "ceo", name: "Erwin Suryawangi", title: "CEO", parent: null, type: "bod", x: 320, y: 100 },
+            { id: "cfo", name: "Ivan Sutanto", title: "CFO", parent: null, type: "bod", x: 920, y: 100 },
+            { id: "coo", name: "Budi Setiawan", title: "COO", parent: null, type: "bod", x: 1720, y: 100 },
+
+            // UNDER CEO (ERWIN)
+            { id: "sales_mgr", name: "Martin Hendrawan", title: "Sales & Marketing Manager", parent: "ceo", type: "manager", x: 320, y: 290 },
+            { id: "csm_spec", name: "Lahana Nirwanda Artami", title: "Community & Social Media Spec.", parent: "sales_mgr", type: "staff", x: 320, y: 490 },
+
+            // UNDER CFO (IVAN)
+            { id: "fin_mgr", name: "Siti Romlah", title: "Finance Manager", parent: "cfo", type: "manager", x: 670, y: 290 },
+            { id: "hr_mgr", name: "Dewi Ariyani", title: "HRGA Manager", parent: "cfo", type: "manager", x: 1170, y: 290 },
+            { id: "qs_vacant", name: "QS (Vacant)", title: "Quantity Surveyor", parent: "cfo", type: "vacant", x: 1420, y: 490 },
+            { id: "estimator_staff", name: "Indah Fitria Rahami", title: "Estimator Staff", parent: "cfo", type: "staff", x: 1670, y: 490 },
+
+            // UNDER FINANCE MGR (SITI ROMLAH)
+            { id: "fin_staff", name: "Rahma Virani Lintang Utomo", title: "Finance & Acct Staff", parent: "fin_mgr", type: "staff", x: 550, y: 490 },
+            { id: "sr_purchasing", name: "Putri Natasya", title: "Senior Purchasing", parent: "fin_mgr", type: "staff", x: 800, y: 490 },
+            
+            // UNDER SR PURCHASING (PUTRI NATASYA)
+            { id: "purchasing_staff", name: "Siti Mayrina Nurazizah", title: "Purchasing Staff", parent: "sr_purchasing", type: "staff", x: 800, y: 690 },
+
+            // UNDER COO (BUDI) - TIM 1 (ARIF)
+            { id: "pm_arif", name: "Arif Saifurrochim", title: "Project Manager", parent: "coo", type: "pm", x: 2000, y: 290 },
+            { id: "sm_helmy", name: "Helmy Setiawan", title: "Site Manager", parent: "pm_arif", type: "sm", x: 1900, y: 490 },
+            { id: "sm_imam", name: "Imam Yuddi P", title: "Site Manager", parent: "pm_arif", type: "sm", x: 1900, y: 690 },
+            { id: "pc_khoirus", name: "Khoirus Syahira", title: "Project Coordinator", parent: "pm_arif", type: "staff", x: 1900, y: 890 },
+            { id: "log_zulkifli", name: "Zulkifli", title: "Logistic Staff", parent: "pc_khoirus", type: "staff", x: 1770, y: 1090 },
+            { id: "log_yasin", name: "Yasin Muchamad Ilham", title: "Logistic Staff", parent: "pc_khoirus", type: "staff", x: 2010, y: 1090 },
+
+            // UNDER COO - TIM 2 (REZA)
+            { id: "pm_reza", name: "Muhammad Reza Pahlevi H.", title: "Project Manager", parent: "coo", type: "pm", x: 2300, y: 290 },
+            { id: "sm_trias", name: "Trias Kusuma Nugraha", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2300, y: 490 },
+            { id: "sm_barkah", name: "Barkah Tri Abdi", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2300, y: 690 },
+            { id: "sm_denny", name: "Denny Fitrianto Saidi", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2300, y: 890 },
+            { id: "pc_ayufy", name: "Ayufy Riska Helmida", title: "Project Coordinator", parent: "pm_reza", type: "staff", x: 2300, y: 1090 },
+            { id: "log_tri", name: "Tri Aditya Setiawan", title: "Logistic Staff", parent: "pc_ayufy", type: "staff", x: 2300, y: 1290 },
+
+            // UNDER COO - TIM 3 (TONI)
+            { id: "pm_toni", name: "Toni Oki Pratama", title: "Jr Project Manager", parent: "coo", type: "pm", x: 2600, y: 290 },
+            { id: "sm_idris", name: "Idris Albawavi", title: "Site Manager", parent: "pm_toni", type: "sm", x: 2600, y: 490 },
+            { id: "sm_ismawan", name: "Ismawan Adhi Ramadhan", title: "Site Manager", parent: "pm_toni", type: "sm", x: 2600, y: 690 },
+            { id: "pc_rahma", name: "Rahma Dwi Nur Hijriah", title: "Project Coordinator", parent: "pm_toni", type: "staff", x: 2600, y: 890 },
+            { id: "log_hanif", name: "Muhammad Hanif", title: "Logistic Staff", parent: "pc_rahma", type: "staff", x: 2600, y: 1090 },
+
+            // UNDER COO - TIM 4 (TOPO)
+            { id: "pm_sutopo", name: "Sutopo", title: "Senior Site Manager", parent: "coo", type: "pm", x: 2900, y: 290 },
+            { id: "sm_reza_a", name: "Reza Afrilianto", title: "Site Manager", parent: "pm_sutopo", type: "sm", x: 2900, y: 490 },
+            { id: "pc_anik", name: "Anik Purmiati", title: "Project Coordinator", parent: "pm_sutopo", type: "staff", x: 2900, y: 690 },
+            { id: "log_ian", name: "Ian Setiawan", title: "Logistic Staff", parent: "sm_reza_a", type: "staff", x: 2900, y: 890 }
+        ];
+
+        // Load data from LocalStorage or Fallback
+        function loadSavedData() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) return JSON.parse(saved);
+            } catch (e) {
+                console.error("Gagal memuat dari local storage", e);
+            }
+            return JSON.parse(JSON.stringify(defaultOrgData));
+        }
+
+        let orgData = loadSavedData();
+
+        // Undo & Redo History Stack
+        let historyStack = [];
+        let redoStack = [];
+        const MAX_HISTORY = 30;
+
+        function saveStateToHistory() {
+            historyStack.push(JSON.stringify(orgData));
+            redoStack = []; // Clear redo stack on new action
+            if (historyStack.length > MAX_HISTORY) {
+                historyStack.shift();
+            }
+        }
+
+        function undo() {
+            if (historyStack.length > 0) {
+                redoStack.push(JSON.stringify(orgData));
+                const previousState = historyStack.pop();
+                orgData = JSON.parse(previousState);
+                renderNodes();
+                autoSaveToLocalStorage();
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                historyStack.push(JSON.stringify(orgData));
+                const nextState = redoStack.pop();
+                orgData = JSON.parse(nextState);
+                renderNodes();
+                autoSaveToLocalStorage();
+            }
+        }
+
+        function autoSaveToLocalStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(orgData));
+                const status = document.getElementById('saveStatus');
+                if (status) {
+                    status.className = "inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200";
+                    status.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Tersimpan Otomatis`;
+                }
+                if (window.lucide) lucide.createIcons();
+            } catch (e) {
+                console.error("Gagal menyimpan ke local storage", e);
+            }
+        }
+
+        // Viewport Transform State (Zoom & Pan)
+        let zoomScale = 0.85;
+        let panX = 40;
+        let panY = 20;
+
+        let viewport, transformer, container, svg, swimlanesContainer;
+
+        // Multi-Select State
+        let selectedNodeIds = new Set();
+
+        function updateTransform() {
+            if (!transformer) return;
+            transformer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+            const zoomText = document.getElementById('zoomLevelText');
+            if (zoomText) zoomText.innerText = `${Math.round(zoomScale * 100)}%`;
+        }
+
+        // Render Swimlanes
+        function renderSwimlanes() {
+            if (!swimlanesContainer) return;
+            swimlanesContainer.innerHTML = '';
+            LEVEL_ZONES.forEach(zone => {
+                const lane = document.createElement('div');
+                lane.className = 'swimlane';
+                lane.style.top = `${zone.top}px`;
+                lane.style.height = `${zone.height}px`;
+                lane.style.backgroundColor = zone.bg;
+
+                lane.innerHTML = `
+                    <div class="swimlane-label" style="background-color: ${zone.labelBg}; color: ${zone.labelColor};">
+                        ${zone.name}
+                    </div>
+                `;
+                swimlanesContainer.appendChild(lane);
+            });
+        }
+
+        // Snap Y position to nearest level swimlane center
+        function snapToNearestLevelY(y) {
+            let closestCenter = LEVEL_ZONES[0].centerY;
+            let minDiff = Math.abs(y - closestCenter);
+
+            LEVEL_ZONES.forEach(zone => {
+                const diff = Math.abs(y - zone.centerY);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestCenter = zone.centerY;
+                }
+            });
+
+            return closestCenter;
+        }
+
+        // Multi-Selection Helper Functions
+        function clearMultiSelection() {
+            selectedNodeIds.clear();
+            updateSelectedNodeClasses();
+        }
+
+        function updateSelectedNodeClasses() {
+            document.querySelectorAll('.org-node').forEach(node => {
+                const nodeId = node.id.replace('node-', '');
+                if (selectedNodeIds.has(nodeId)) {
+                    node.classList.add('multi-selected');
+                } else {
+                    node.classList.remove('multi-selected');
+                }
+            });
+        }
+
+        // Render All Nodes on Canvas
+        function renderNodes() {
+            if (!container) return;
+            container.innerHTML = '';
+
+            orgData.forEach(item => {
+                const node = document.createElement('div');
+                node.id = `node-${item.id}`;
+                node.className = `org-node node-${item.type} ${selectedNodeIds.has(item.id) ? 'multi-selected' : ''}`;
+                node.style.left = `${item.x}px`;
+                node.style.top = `${item.y}px`;
+                node.setAttribute('data-name', item.name.toLowerCase());
+                node.setAttribute('data-title', item.title.toLowerCase());
+
+                node.innerHTML = `
+                    <div class="node-actions">
+                        <button onclick="openEditModal('${item.id}')" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                            <i data-lucide="pencil" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">${item.name}</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${item.title}</div>
+                `;
+
+                node.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isConnectingMode) {
+                        handleConnectClick(item.id);
+                    }
+                });
+
+                node.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    openEditModal(item.id);
+                });
+
+                makeDraggable(node, item.id);
+                container.appendChild(node);
+            });
+
+            if (window.lucide) lucide.createIcons();
+            updateConnectors();
+        }
+
+        // Generate Clean Unified Tree Bus Connectors
+        function generateConnectorsSvgString(offsetX = 0, offsetY = 0, markerId = 'arrow') {
+            let pathsSvg = '';
+            const nodeMap = {};
+            orgData.forEach(d => nodeMap[d.id] = d);
+
+            const childrenByParent = {};
+            orgData.forEach(item => {
+                if (item.parent && nodeMap[item.parent]) {
+                    if (!childrenByParent[item.parent]) {
+                        childrenByParent[item.parent] = [];
+                    }
+                    childrenByParent[item.parent].push(item);
+                }
+            });
+
+            Object.keys(childrenByParent).forEach(parentId => {
+                const parent = nodeMap[parentId];
+                const children = childrenByParent[parentId];
+
+                const pX = (parent.x - offsetX) + 105;
+                const pY = (parent.y - offsetY) + 64;
+
+                if (children.length === 1) {
+                    const child = children[0];
+                    const cX = (child.x - offsetX) + 105;
+                    const cY = (child.y - offsetY);
+
+                    let pathD = "";
+                    if (Math.abs(pX - cX) < 2) {
+                        pathD = `M ${pX} ${pY} L ${cX} ${cY}`;
+                    } else {
+                        const midY = pY + (cY - pY) / 2;
+                        pathD = `M ${pX} ${pY} L ${pX} ${midY} L ${cX} ${midY} L ${cX} ${cY}`;
+                    }
+
+                    pathsSvg += `<path d="${pathD}" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#${markerId})" />`;
+                } else {
+                    const minChildY = Math.min(...children.map(c => c.y - offsetY));
+                    const busY = pY + Math.min(30, (minChildY - pY) / 2);
+
+                    const childCenterXArray = children.map(c => (c.x - offsetX) + 105);
+                    const minBusX = Math.min(pX, ...childCenterXArray);
+                    const maxBusX = Math.max(pX, ...childCenterXArray);
+
+                    pathsSvg += `<path d="M ${pX} ${pY} L ${pX} ${busY}" stroke="#64748b" stroke-width="2" fill="none" />`;
+                    pathsSvg += `<path d="M ${minBusX} ${busY} L ${maxBusX} ${busY}" stroke="#64748b" stroke-width="2" fill="none" />`;
+
+                    children.forEach(child => {
+                        const cX = (child.x - offsetX) + 105;
+                        const cY = (child.y - offsetY);
+                        pathsSvg += `<path d="M ${cX} ${busY} L ${cX} ${cY}" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#${markerId})" />`;
+                    });
+                }
+            });
+
+            return pathsSvg;
+        }
+
+        function updateConnectors() {
+            if (!svg) return;
+            svg.innerHTML = `
+                <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+                    </marker>
+                </defs>
+                ${generateConnectorsSvgString(0, 0, 'arrow')}
+            `;
+        }
+
+        // Draggable Functionality with Magnetic Level Snap & Multi-Select Group Support
+        function makeDraggable(element, id) {
+            let isDragging = false;
+            let startX, startY;
+            let initialPositions = {};
+
+            element.addEventListener('mousedown', (e) => {
+                if (isConnectingMode || e.target.closest('.node-actions')) return;
+                e.stopPropagation();
+
+                saveStateToHistory();
+
+                if (!selectedNodeIds.has(id) && !e.shiftKey) {
+                    clearMultiSelection();
+                    selectedNodeIds.add(id);
+                    updateSelectedNodeClasses();
+                } else if (e.shiftKey && !selectedNodeIds.has(id)) {
+                    selectedNodeIds.add(id);
+                    updateSelectedNodeClasses();
+                }
+
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+
+                selectedNodeIds.forEach(selectedId => {
+                    const nodeData = orgData.find(d => d.id === selectedId);
+                    if (nodeData) {
+                        initialPositions[selectedId] = { x: nodeData.x, y: nodeData.y };
+                        const nodeEl = document.getElementById(`node-${selectedId}`);
+                        if (nodeEl) nodeEl.classList.add('dragging');
+                    }
+                });
+
+                function onMouseMove(e) {
+                    if (!isDragging) return;
+                    const dx = (e.clientX - startX) / zoomScale;
+                    const dy = (e.clientY - startY) / zoomScale;
+
+                    selectedNodeIds.forEach(selectedId => {
+                        const nodeData = orgData.find(d => d.id === selectedId);
+                        const initialPos = initialPositions[selectedId];
+                        if (nodeData && initialPos) {
+                            nodeData.x = initialPos.x + dx;
+                            nodeData.y = initialPos.y + dy;
+
+                            const nodeEl = document.getElementById(`node-${selectedId}`);
+                            if (nodeEl) {
+                                nodeEl.style.left = `${nodeData.x}px`;
+                                nodeEl.style.top = `${nodeData.y}px`;
+                            }
+                        }
+                    });
+
+                    updateConnectors();
+                }
+
+                function onMouseUp() {
+                    if (isDragging) {
+                        isDragging = false;
+
+                        selectedNodeIds.forEach(selectedId => {
+                            const nodeData = orgData.find(d => d.id === selectedId);
+                            if (nodeData) {
+                                nodeData.y = snapToNearestLevelY(nodeData.y);
+                                const nodeEl = document.getElementById(`node-${selectedId}`);
+                                if (nodeEl) {
+                                    nodeEl.style.top = `${nodeData.y}px`;
+                                    nodeEl.classList.remove('dragging');
+                                }
+                            }
+                        });
+
+                        updateConnectors();
+                        autoSaveToLocalStorage();
+
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    }
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        // Interactive Re-Connect Mode
+        let isConnectingMode = false;
+        let connectChildId = null;
+
+        function toggleConnectMode() {
+            isConnectingMode = !isConnectingMode;
+            connectChildId = null;
+
+            const banner = document.getElementById('connectBanner');
+            const btn = document.getElementById('connectModeBtn');
+
+            if (isConnectingMode) {
+                if (banner) banner.classList.remove('hidden');
+                if (btn) btn.classList.add('bg-amber-100', 'border-amber-400');
+                const bannerText = document.getElementById('connectBannerText');
+                if (bannerText) bannerText.innerText = 'Langkah 1: Klik Kotak Bawahan (Child)';
+            } else {
+                if (banner) banner.classList.add('hidden');
+                if (btn) btn.classList.remove('bg-amber-100', 'border-amber-400');
+                clearNodeHighlights();
+            }
+        }
+
+        function handleConnectClick(nodeId) {
+            if (!connectChildId) {
+                connectChildId = nodeId;
+                const nodeEl = document.getElementById(`node-${nodeId}`);
+                if (nodeEl) nodeEl.classList.add('selected-child');
+                const bannerText = document.getElementById('connectBannerText');
+                if (bannerText) bannerText.innerText = `Bawahan dipilih: ${getNodeName(nodeId)}. Sekarang klik Kotak Atasan (Parent)`;
+                
+                orgData.forEach(d => {
+                    if (d.id !== nodeId) {
+                        const targetEl = document.getElementById(`node-${d.id}`);
+                        if (targetEl) targetEl.classList.add('target-parent');
+                    }
+                });
+            } else {
+                if (connectChildId === nodeId) {
+                    alert("Sebuah node tidak bisa menjadi atasan untuk dirinya sendiri.");
+                    return;
+                }
+
+                if (isDescendant(connectChildId, nodeId)) {
+                    alert("Tidak dapat menghubungkan! Hal ini akan menyebabkan siklus/looping melingkar.");
+                    return;
+                }
+
+                saveStateToHistory();
+                const childObj = orgData.find(d => d.id === connectChildId);
+                childObj.parent = nodeId;
+
+                toggleConnectMode();
+                renderNodes();
+                autoSaveToLocalStorage();
+            }
+        }
+
+        function isDescendant(parentId, childId) {
+            let current = orgData.find(d => d.id === childId);
+            while (current && current.parent) {
+                if (current.parent === parentId) return true;
+                current = orgData.find(d => d.id === current.parent);
+            }
+            return false;
+        }
+
+        function clearNodeHighlights() {
+            document.querySelectorAll('.org-node').forEach(node => {
+                node.classList.remove('selected-child', 'target-parent');
+            });
+        }
+
+        function getNodeName(id) {
+            const item = orgData.find(d => d.id === id);
+            return item ? item.name : id;
+        }
+
+        // Helper to Convert String to Title Case (Capitalize First Letter of Every Word)
+        function toTitleCase(str) {
+            return str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function(a) { return a.toUpperCase(); });
+        }
+
+        // Map Level Key to Swimlane Center Y Position
+        function getCenterYForLevel(levelType) {
+            const levelZoneMap = {
+                'bod': 100,
+                'manager': 290,
+                'senior_staff': 490,
+                'junior_staff': 690,
+                'probation': 890
+            };
+            return levelZoneMap[levelType] || 490;
+        }
+
+        // Populate Positions List for Dropdown
+        function populateTitleDropdown(selectedTitle = '') {
+            const titleSelect = document.getElementById('modalTitleSelect');
+            const customInput = document.getElementById('modalCustomTitleInput');
+            if (!titleSelect) return;
+
+            // Extract unique titles from orgData
+            const titlesSet = new Set();
+            orgData.forEach(d => {
+                if (d.title) titlesSet.add(d.title.trim());
+            });
+
+            const uniqueTitles = Array.from(titlesSet).sort();
+
+            titleSelect.innerHTML = '';
+            uniqueTitles.forEach(title => {
+                titleSelect.innerHTML += `<option value="${title}">${title}</option>`;
+            });
+            titleSelect.innerHTML += `<option value="__NEW_TITLE__">+ Tambah Posisi Baru...</option>`;
+
+            if (selectedTitle && uniqueTitles.includes(selectedTitle)) {
+                titleSelect.value = selectedTitle;
+                if (customInput) customInput.classList.add('hidden');
+            } else if (selectedTitle) {
+                titleSelect.value = '__NEW_TITLE__';
+                if (customInput) {
+                    customInput.value = selectedTitle;
+                    customInput.classList.remove('hidden');
+                }
+            } else {
+                if (customInput) customInput.classList.add('hidden');
+            }
+        }
+
+        // Modal Form Handlers
+        function openEditModal(nodeId = null) {
+            const modal = document.getElementById('nodeModal');
+            const parentSelect = document.getElementById('modalParentSelect');
+            
+            if (!modal || !parentSelect) return;
+
+            parentSelect.innerHTML = '<option value="">-- Tidak Ada (Top Level / C-Level) --</option>';
+            orgData.forEach(d => {
+                if (d.id !== nodeId) {
+                    parentSelect.innerHTML += `<option value="${d.id}">${d.name} (${d.title})</option>`;
+                }
+            });
+
+            if (nodeId) {
+                const item = orgData.find(d => d.id === nodeId);
+                document.getElementById('modalTitle').innerText = 'Edit Data Personil';
+                document.getElementById('modalNodeId').value = item.id;
+                document.getElementById('modalName').value = item.name;
+                populateTitleDropdown(item.title);
+                document.getElementById('modalParentSelect').value = item.parent || '';
+                document.getElementById('modalTypeSelect').value = item.type || 'staff';
+                document.getElementById('deleteNodeBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('modalTitle').innerText = 'Tambah Personil Baru';
+                document.getElementById('modalNodeId').value = '';
+                document.getElementById('modalName').value = '';
+                populateTitleDropdown('');
+                document.getElementById('modalParentSelect').value = '';
+                document.getElementById('modalTypeSelect').value = 'junior_staff';
+                document.getElementById('deleteNodeBtn').classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('nodeModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // High-Resolution Pure SVG to PNG Export (Guaranteed No Label Overlap)
+        function exportChartToPng() {
+            try {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                orgData.forEach(node => {
+                    if (node.x < minX) minX = node.x;
+                    if (node.y < minY) minY = node.y;
+                    if (node.x + 210 > maxX) maxX = node.x + 210;
+                    if (node.y + 64 > maxY) maxY = node.y + 64;
+                });
+
+                const leftMargin = 220; // Room on the left specifically for swimlane labels
+                const padding = 60;
+                const startX = Math.max(0, minX - padding) - leftMargin;
+                const startY = Math.max(0, minY - padding);
+                const exportWidth = (maxX - minX) + (padding * 2) + leftMargin;
+                const exportHeight = (maxY - minY) + (padding * 2);
+
+                // Swimlanes XML for Export (Label placed in the left margin area)
+                let swimlanesXml = '';
+                LEVEL_ZONES.forEach(zone => {
+                    const zTop = zone.top - startY;
+                    if (zTop + zone.height > 0 && zTop < exportHeight) {
+                        swimlanesXml += `
+                            <rect x="0" y="${zTop}" width="${exportWidth}" height="${zone.height}" fill="${zone.bg}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4" />
+                            <rect x="20" y="${zTop + 10}" width="180" height="26" rx="6" fill="${zone.labelBg}" />
+                            <text x="30" y="${zTop + 27}" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="${zone.labelColor}">${zone.name}</text>
+                        `;
+                    }
+                });
+
+                // Connectors XML (Uses EXACT Same Unified Bus Logic as App Canvas)
+                const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport');
+
+                // Nodes XML (Pure SVG Rects and Texts matching card styling)
+                let nodesXml = '';
+                orgData.forEach(item => {
+                    const nx = item.x - startX;
+                    const ny = item.y - startY;
+
+                    let bgFill = "#ffffff";
+                    let strokeColor = "#cbd5e1";
+                    let nameColor = "#1e293b";
+                    let titleColor = "#64748b";
+                    let accentBar = "";
+
+                    if (item.type === 'bod') {
+                        bgFill = "#0f172a";
+                        strokeColor = "#334155";
+                        nameColor = "#ffffff";
+                        titleColor = "#cbd5e1";
+                    } else if (item.type === 'manager') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#8b5cf6" />`;
+                    else if (item.type === 'pm') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#f59e0b" />`;
+                    else if (item.type === 'sm') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#10b981" />`;
+                    else if (item.type === 'staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#3b82f6" />`;
+                    else if (item.type === 'vacant') {
+                        bgFill = "#fffbe8";
+                        strokeColor = "#f59e0b";
+                    }
+
+                    const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const safeTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                    nodesXml += `
+                        <g>
+                            <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1.5" />
+                            ${accentBar}
+                            <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="${nameColor}">${safeName}</text>
+                            <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" font-weight="500" fill="${titleColor}">${safeTitle}</text>
+                        </g>
+                    `;
+                });
+
+                const svgString = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">
+                        <defs>
+                            <style>
+                                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+                            </style>
+                            <marker id="arrowExport" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+                            </marker>
+                        </defs>
+                        <rect width="100%" height="100%" fill="#f8fafc" />
+                        ${swimlanesXml}
+                        ${pathsSvg}
+                        ${nodesXml}
+                    </svg>
+                `;
+
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    const scale = 2; // High Resolution Retina
+                    canvas.width = exportWidth * scale;
+                    canvas.height = exportHeight * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.scale(scale, scale);
+
+                    ctx.drawImage(img, 0, 0);
+                    URL.revokeObjectURL(url);
+
+                    const pngUrl = canvas.toDataURL('image/png');
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = pngUrl;
+                    downloadLink.download = 'Struktur_Organisasi_PT_STK.png';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                };
+
+                img.onerror = function() {
+                    alert("Gagal memproses gambar PNG. Silakan coba lagi.");
+                };
+
+                img.src = url;
+            } catch (err) {
+                console.error("Export PNG Error:", err);
+                alert("Terjadi kesalahan saat mengunduh gambar.");
+            }
+        }
+
+        // Initialize App & Event Listeners
+        function initApp() {
+            viewport = document.getElementById('viewport');
+            transformer = document.getElementById('chartTransformer');
+            container = document.getElementById('nodesContainer');
+            svg = document.getElementById('svgConnectors');
+            swimlanesContainer = document.getElementById('swimlanesContainer');
+            const selectionBox = document.getElementById('selectionBox');
+
+            if (!viewport) return;
+
+            renderSwimlanes();
+
+            // Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z, Ctrl+Z, Ctrl+Y)
+            window.addEventListener('keydown', (e) => {
+                const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+                const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+
+                if (cmdKey && e.shiftKey && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    redo();
+                } else if (cmdKey && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    undo();
+                } else if (cmdKey && e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            });
+
+            // Box Area Drag Selection / Canvas Panning
+            let isPanning = false;
+            let panStartX = 0, panStartY = 0;
+            let isBoxSelecting = false;
+            let boxStartX = 0, boxStartY = 0;
+
+            viewport.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.org-node') || e.target.closest('button') || e.target.closest('input')) return;
+
+                if (e.shiftKey) {
+                    isBoxSelecting = true;
+                    const chartRect = document.getElementById('chartArea').getBoundingClientRect();
+                    boxStartX = (e.clientX - chartRect.left) / zoomScale;
+                    boxStartY = (e.clientY - chartRect.top) / zoomScale;
+
+                    if (selectionBox) {
+                        selectionBox.style.left = `${boxStartX}px`;
+                        selectionBox.style.top = `${boxStartY}px`;
+                        selectionBox.style.width = '0px';
+                        selectionBox.style.height = '0px';
+                        selectionBox.style.display = 'block';
+                    }
+                } else {
+                    clearMultiSelection();
+                    isPanning = true;
+                    viewport.classList.add('grabbing');
+                    panStartX = e.clientX - panX;
+                    panStartY = e.clientY - panY;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (isPanning) {
+                    panX = e.clientX - panStartX;
+                    panY = e.clientY - panStartY;
+                    updateTransform();
+                } else if (isBoxSelecting && selectionBox) {
+                    const chartRect = document.getElementById('chartArea').getBoundingClientRect();
+                    const currentX = (e.clientX - chartRect.left) / zoomScale;
+                    const currentY = (e.clientY - chartRect.top) / zoomScale;
+
+                    const left = Math.min(boxStartX, currentX);
+                    const top = Math.min(boxStartY, currentY);
+                    const width = Math.abs(currentX - boxStartX);
+                    const height = Math.abs(currentY - boxStartY);
+
+                    selectionBox.style.left = `${left}px`;
+                    selectionBox.style.top = `${top}px`;
+                    selectionBox.style.width = `${width}px`;
+                    selectionBox.style.height = `${height}px`;
+
+                    orgData.forEach(item => {
+                        const nodeRight = item.x + 210;
+                        const nodeBottom = item.y + 64;
+                        const intersects = (item.x < left + width && nodeRight > left && item.y < top + height && nodeBottom > top);
+
+                        if (intersects) {
+                            selectedNodeIds.add(item.id);
+                        } else {
+                            selectedNodeIds.delete(item.id);
+                        }
+                    });
+                    updateSelectedNodeClasses();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isPanning) {
+                    isPanning = false;
+                    viewport.classList.remove('grabbing');
+                }
+                if (isBoxSelecting) {
+                    isBoxSelecting = false;
+                    if (selectionBox) selectionBox.style.display = 'none';
+                }
+            });
+
+            // Wheel Zooming
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 1 : -1;
+                
+                const oldScale = zoomScale;
+                if (delta > 0) {
+                    zoomScale = Math.min(2.5, zoomScale * 1.08);
+                } else {
+                    zoomScale = Math.max(0.2, zoomScale / 1.08);
+                }
+
+                const rect = viewport.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                panX = mouseX - (mouseX - panX) * (zoomScale / oldScale);
+                panY = mouseY - (mouseY - panY) * (zoomScale / oldScale);
+
+                updateTransform();
+            }, { passive: false });
+
+            // Form Submit
+            const nodeForm = document.getElementById('nodeForm');
+            const titleSelectEl = document.getElementById('modalTitleSelect');
+            const customTitleInputEl = document.getElementById('modalCustomTitleInput');
+            const nameInputEl = document.getElementById('modalName');
+
+            if (titleSelectEl && customTitleInputEl) {
+                titleSelectEl.addEventListener('change', (e) => {
+                    if (e.target.value === '__NEW_TITLE__') {
+                        customTitleInputEl.classList.remove('hidden');
+                        customTitleInputEl.focus();
+                    } else {
+                        customTitleInputEl.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Capitalize Name Input Realtime
+            if (nameInputEl) {
+                nameInputEl.addEventListener('blur', (e) => {
+                    e.target.value = toTitleCase(e.target.value);
+                });
+            }
+
+            if (nodeForm) {
+                nodeForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    saveStateToHistory();
+
+                    const id = document.getElementById('modalNodeId').value;
+                    const rawName = document.getElementById('modalName').value;
+                    const name = toTitleCase(rawName);
+
+                    let title = titleSelectEl.value;
+                    if (title === '__NEW_TITLE__') {
+                        title = customTitleInputEl.value.trim();
+                        if (!title) {
+                            alert("Silakan masukkan nama posisi baru.");
+                            return;
+                        }
+                    }
+
+                    const parent = document.getElementById('modalParentSelect').value || null;
+                    const type = document.getElementById('modalTypeSelect').value;
+                    const targetY = getCenterYForLevel(type);
+
+                    if (id) {
+                        const item = orgData.find(d => d.id === id);
+                        item.name = name;
+                        item.title = title;
+                        item.parent = parent;
+                        item.type = type;
+                        item.y = targetY; // Move node to designated level area center
+                    } else {
+                        const newId = 'node_' + Date.now();
+                        orgData.push({
+                            id: newId,
+                            name: name,
+                            title: title,
+                            parent: parent,
+                            type: type,
+                            x: Math.abs(panX) + 500,
+                            y: targetY // Auto position in selected level area
+                        });
+                    }
+
+                    closeModal();
+                    renderNodes();
+                    autoSaveToLocalStorage();
+                });
+            }
+
+            // Delete Node Button
+            const deleteNodeBtn = document.getElementById('deleteNodeBtn');
+            if (deleteNodeBtn) {
+                deleteNodeBtn.addEventListener('click', () => {
+                    const id = document.getElementById('modalNodeId').value;
+                    if (id && confirm(`Yakin ingin menghapus ${getNodeName(id)}?`)) {
+                        saveStateToHistory();
+                        const nodeToDelete = orgData.find(d => d.id === id);
+                        orgData.forEach(d => {
+                            if (d.parent === id) d.parent = nodeToDelete.parent;
+                        });
+                        orgData = orgData.filter(d => d.id !== id);
+                        closeModal();
+                        renderNodes();
+                        autoSaveToLocalStorage();
+                    }
+                });
+            }
+
+            // Search Input
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    const query = e.target.value.toLowerCase().trim();
+                    document.querySelectorAll('.org-node').forEach(node => {
+                        const name = node.getAttribute('data-name');
+                        const title = node.getAttribute('data-title');
+                        if (query !== '' && (name.includes(query) || title.includes(query))) {
+                            node.classList.add('highlight-search');
+                        } else {
+                            node.classList.remove('highlight-search');
+                        }
+                    });
+                });
+            }
+
+            // Zoom & Control Buttons
+            const zoomInBtn = document.getElementById('zoomInBtn');
+            if (zoomInBtn) zoomInBtn.addEventListener('click', () => {
+                zoomScale = Math.min(2.5, zoomScale * 1.15);
+                updateTransform();
+            });
+
+            const zoomOutBtn = document.getElementById('zoomOutBtn');
+            if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => {
+                zoomScale = Math.max(0.2, zoomScale / 1.15);
+                updateTransform();
+            });
+
+            const resetViewBtn = document.getElementById('resetViewBtn');
+            if (resetViewBtn) {
+                resetViewBtn.addEventListener('click', () => {
+                    zoomScale = 0.85;
+                    panX = 40;
+                    panY = 20;
+                    updateTransform();
+                });
+            }
+
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn) undoBtn.addEventListener('click', undo);
+
+            const redoBtn = document.getElementById('redoBtn');
+            if (redoBtn) redoBtn.addEventListener('click', redo);
+
+            const connectModeBtn = document.getElementById('connectModeBtn');
+            if (connectModeBtn) connectModeBtn.addEventListener('click', toggleConnectMode);
+
+            const cancelConnectBtn = document.getElementById('cancelConnectBtn');
+            if (cancelConnectBtn) cancelConnectBtn.addEventListener('click', toggleConnectMode);
+
+            const addNodeBtn = document.getElementById('addNodeBtn');
+            if (addNodeBtn) addNodeBtn.addEventListener('click', () => openEditModal(null));
+
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+
+            const cancelModalBtn = document.getElementById('cancelModalBtn');
+            if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
+
+            const exportPngBtn = document.getElementById('exportPngBtn');
+            if (exportPngBtn) exportPngBtn.addEventListener('click', exportChartToPng);
+
+            renderNodes();
+            updateTransform();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+    </script>
+
+</body></html>
