@@ -6,8 +6,6 @@
     <title>STK Organization Chart</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons CDN -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Font Family Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -106,7 +104,7 @@
             text-align: center;
             cursor: move;
             z-index: 10;
-            transition: border-color 0.15s, box-shadow 0.15s;
+            transition: border-color 0.15s, box-shadow 0.15s, transform 0.2s ease-in-out;
         }
 
         .org-node:hover {
@@ -154,7 +152,7 @@
             50% { border-color: #059669; }
         }
 
-        /* Visual Department Themes */
+        /* Visual Department & Level Themes */
         .node-bod {
             background: linear-gradient(135deg, #0f172a, #1e293b);
             color: #ffffff;
@@ -166,6 +164,9 @@
         .node-pm { border-left: 5px solid #f59e0b; }
         .node-sm { border-left: 5px solid #10b981; }
         .node-staff { border-left: 5px solid #3b82f6; }
+        .node-senior_staff { border-left: 5px solid #0284c7; }
+        .node-junior_staff { border-left: 5px solid #10b981; }
+
         .node-vacant {
             border: 1.5px dashed #f59e0b !important;
             background-color: #fff7ed;
@@ -178,14 +179,24 @@
             background-color: #ffedd5;
         }
 
+        /* Enhanced Clear Search Highlight Animation */
         .highlight-search {
             outline: 3px solid #6366f1 !important;
-            animation: pulse 1.5s infinite;
+            border-color: #6366f1 !important;
+            background-color: #e0e7ff !important;
+            animation: searchPulse 1s infinite alternate;
+            z-index: 40 !important;
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.04); }
+        @keyframes searchPulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+            }
+            100% {
+                transform: scale(1.12);
+                box-shadow: 0 0 25px 10px rgba(99, 102, 241, 0.65);
+            }
         }
 
         /* Action Buttons on Node Hover */
@@ -201,15 +212,67 @@
         .org-node:hover .node-actions {
             display: flex;
         }
+
+        /* Icon inline (SVG sprite di dalam file ini), tidak bergantung pada library CDN */
+        .ic {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+        }
+
+        /* Toast pengganti alert(): alert() diblokir di preview sandbox */
+        #toast {
+            position: fixed;
+            left: 50%;
+            bottom: 28px;
+            transform: translateX(-50%) translateY(12px);
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 10px 16px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.35);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 300;
+            max-width: min(92vw, 520px);
+            text-align: center;
+        }
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-800">
+    <!-- Icon sprite (lucide, ISC license), inline supaya icon tidak hilang kalau CDN diblokir -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+        <symbol id="i-network" viewBox="0 0 24 24"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+        <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="8" x2="14" y1="11" y2="11"/></symbol>
+        <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></symbol>
+        <symbol id="i-maximize-2" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></symbol>
+        <symbol id="i-undo-2" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+        <symbol id="i-redo-2" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></symbol>
+        <symbol id="i-git-fork" viewBox="0 0 24 24"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></symbol>
+        <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+        <symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
+        <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    </defs></svg>
 
     <!-- HEADER / TOOLBAR -->
     <header class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap justify-between items-center z-30 shadow-sm gap-4">
         <div class="flex items-center space-x-3">
             <div class="bg-indigo-600 text-white p-2 rounded-xl shadow">
-                <i data-lucide="network" class="w-6 h-6"></i>
+                <svg class="w-6 h-6 ic" aria-hidden="true"><use href="#i-network"/></svg>
             </div>
             <div>
                 <div class="flex items-center gap-2">
@@ -221,7 +284,7 @@
 
         <!-- Mode Indicator / Banner -->
         <div id="connectBanner" class="hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 animate-pulse">
-            <i data-lucide="link" class="w-4 h-4"></i>
+            <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-link"/></svg>
             <span id="connectBannerText">Langkah 1: Klik Kotak Bawahan (Child Node)</span>
             <button id="cancelConnectBtn" class="text-amber-900 underline hover:text-black ml-2 text-[11px]">Batal</button>
         </div>
@@ -229,40 +292,40 @@
         <div class="flex items-center flex-wrap gap-3">
             <!-- Search -->
             <div class="relative w-44">
-                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 ic" aria-hidden="true"><use href="#i-search"/></svg>
                 <input type="text" id="searchInput" placeholder="Cari nama / posisi..." class="w-full pl-9 pr-3 py-1.5 bg-slate-100 text-slate-800 text-xs rounded-lg border border-slate-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition">
             </div>
 
             <!-- Zoom Controls -->
             <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
                 <button id="zoomOutBtn" title="Zoom Out (-)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
-                    <i data-lucide="zoom-out" class="w-4 h-4"></i>
+                    <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-zoom-out"/></svg>
                 </button>
                 <span id="zoomLevelText" class="px-2 text-slate-600 min-w-[45px] text-center">50%</span>
                 <button id="zoomInBtn" title="Zoom In (+)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
-                    <i data-lucide="zoom-in" class="w-4 h-4"></i>
+                    <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-zoom-in"/></svg>
                 </button>
                 <button id="resetViewBtn" title="Reset Pandangan / Center" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm ml-1 border-l border-slate-200">
-                    <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                    <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-maximize-2"/></svg>
                 </button>
             </div>
 
             <!-- Toolbar Controls -->
             <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
                 <button id="undoBtn" title="Undo Langkah (Cmd+Z / Ctrl+Z)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="undo-2" class="w-3.5 h-3.5 text-slate-600"></i> Undo
+                    <svg class="w-3.5 h-3.5 text-slate-600 ic" aria-hidden="true"><use href="#i-undo-2"/></svg> Undo
                 </button>
                 <button id="redoBtn" title="Redo Langkah (Cmd+Shift+Z / Ctrl+Y)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="redo-2" class="w-3.5 h-3.5 text-slate-600"></i> Redo
+                    <svg class="w-3.5 h-3.5 text-slate-600 ic" aria-hidden="true"><use href="#i-redo-2"/></svg> Redo
                 </button>
                 <button id="connectModeBtn" title="Ubah Relasi Pelaporan / Konektor" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="git-fork" class="w-3.5 h-3.5 text-indigo-600"></i> Ubah Atasan
+                    <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-git-fork"/></svg> Ubah Atasan
                 </button>
                 <button id="addNodeBtn" title="Tambah Personil Baru" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="user-plus" class="w-3.5 h-3.5 text-indigo-600"></i> Tambah Node
+                    <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-user-plus"/></svg> Tambah Node
                 </button>
                 <button id="exportPngBtn" title="Unduh Gambar PNG" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Export PNG
+                    <svg class="w-3.5 h-3.5 ic" aria-hidden="true"><use href="#i-download"/></svg> Export PNG
                 </button>
             </div>
         </div>
@@ -292,7 +355,7 @@
         <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
             <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <h3 id="modalTitle" class="font-bold text-slate-800 text-sm">Edit Data Personil</h3>
-                <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600"><svg class="w-5 h-5 ic" aria-hidden="true"><use href="#i-x"/></svg></button>
             </div>
             <form id="nodeForm" class="p-6 space-y-4">
                 <input type="hidden" id="modalNodeId">
@@ -312,7 +375,7 @@
                     <select id="modalTitleSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                         <!-- Populated dynamically -->
                     </select>
-                    <input type="text" id="modalCustomTitleInput" placeholder="Ketik nama posisi baru..." class="w-full px-3 py-2 mt-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 hidden">
+                    <input type="text" id="modalCustomTitleInput" placeholder="Ketik nama posisi baru..." class="w-full px-3 py-2 mt-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 capitalize hidden">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Atasan Direct (Report To)</label>
@@ -331,22 +394,22 @@
                 </div>
                 <div class="pt-2 flex justify-between items-center gap-2">
                     <button type="button" id="deleteNodeBtn" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Node
+                        <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-trash-2"/></svg> Hapus Node
                     </button>
                     <div class="flex gap-2">
                         <button type="button" id="cancelModalBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">Batal</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow">Simpan</button>
+                        <button type="button" id="saveNodeBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow">Simpan</button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- CUSTOM CONFIRMATION MODAL (Replaces browser confirm() for Preview compatibility) -->
+    <!-- CUSTOM CONFIRMATION MODAL -->
     <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden p-6 text-center">
             <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                <i data-lucide="trash-2" class="w-6 h-6"></i>
+                <svg class="w-6 h-6 ic" aria-hidden="true"><use href="#i-trash-2"/></svg>
             </div>
             <h3 class="font-bold text-slate-900 text-base mb-1">Konfirmasi Hapus</h3>
             <p id="confirmModalText" class="text-xs text-slate-600 mb-6">Apakah Anda yakin ingin menghapus personil ini?</p>
@@ -357,11 +420,13 @@
         </div>
     </div>
 
-    <script>
-        // LocalStorage Key (Version 10)
-        const STORAGE_KEY = 'STK_ORG_CHART_DATA_V11';
+    <div id="toast" role="status" aria-live="polite"></div>
 
-        // Swimlane Heights & Centers Definition (Probation level removed)
+    <script>
+        // LocalStorage Key (Version 13, naik karena layout default berubah)
+        const STORAGE_KEY = 'STK_ORG_CHART_DATA_V13';
+
+        // Swimlane Heights & Centers Definition
         const LEVEL_ZONES = [
             { id: "bod", name: "LEVEL BOD", top: 40, height: 180, centerY: 100, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0f172a", labelColor: "#ffffff" },
             { id: "manager", name: "LEVEL MANAGER", top: 220, height: 200, centerY: 290, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#8b5cf6", labelColor: "#ffffff" },
@@ -369,60 +434,59 @@
             { id: "junior_staff", name: "LEVEL JUNIOR STAFF", top: 620, height: 200, centerY: 690, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#10b981", labelColor: "#ffffff" }
         ];
 
-        // Initial Organogram Data Structure aligned with reference images & exact positions
+        // Initial Organogram Data, mengikuti gambar referensi (posisi x, level, dan atasan).
+        // Jarak antar node satu level minimal 20px, jalur konektor tidak menembus node lain.
         const defaultOrgData = [
             // C-LEVEL (BOD)
             { id: "ceo", name: "Erwin Suryawangi", title: "CEO", parent: null, type: "bod", x: 320, y: 100 },
-            { id: "cfo", name: "Ivan Sutanto", title: "CFO", parent: null, type: "bod", x: 920, y: 100 },
-            { id: "coo", name: "Budi Setiawan", title: "COO", parent: null, type: "bod", x: 2614.24, y: 100 },
+            { id: "cfo", name: "Ivan Sutanto", title: "CFO", parent: null, type: "bod", x: 964, y: 100 },
+            { id: "coo", name: "Budi Setiawan", title: "COO", parent: null, type: "bod", x: 2660, y: 100 },
 
             // UNDER CEO (ERWIN)
             { id: "sales_mgr", name: "Martin Hendrawan", title: "Sales & Marketing Manager", parent: "ceo", type: "manager", x: 320, y: 290 },
-            { id: "csm_spec", name: "Lahana Nirwanda Artami", title: "Community & Social Media Spec.", parent: "sales_mgr", type: "staff", x: 320, y: 690 },
+            { id: "csm_spec", name: "Lahana Nirwanda Artami", title: "Community & Social Media Spec.", parent: "sales_mgr", type: "junior_staff", x: 320, y: 690 },
 
             // UNDER CFO (IVAN)
-            { id: "fin_mgr", name: "Siti Romlah", title: "Finance Manager", parent: "cfo", type: "manager", x: 670, y: 290 },
-            { id: "hr_mgr", name: "Dewi Ariyani", title: "HRGA Manager", parent: "cfo", type: "manager", x: 919.818, y: 290 },
-            { id: "qs_vacant", name: "QS (Vacant)", title: "Quantity Surveyor", parent: "cfo", type: "vacant", x: 1080.47, y: 490 },
-            { id: "estimator_staff", name: "Indah Fitria Rahami", title: "Estimator Staff", parent: "qs_vacant", type: "staff", x: 1082.27, y: 690 },
+            { id: "fin_mgr", name: "Siti Romlah", title: "Finance Manager", parent: "cfo", type: "manager", x: 714, y: 290 },
+            { id: "hr_mgr", name: "Dewi Ariyani", title: "HRGA Manager", parent: "cfo", type: "manager", x: 964, y: 290 },
+            { id: "qs_vacant", name: "Quantity Surveyor (Vacant)", title: "Quantity Surveyor", parent: "cfo", type: "vacant", x: 1124, y: 490 },
+            { id: "estimator_staff", name: "Indah Fitria Rahami", title: "Estimator Staff", parent: "qs_vacant", type: "junior_staff", x: 1124, y: 690 },
 
             // UNDER FINANCE MGR (SITI ROMLAH)
-            { id: "fin_staff", name: "Rahma Virani Lintang Utomo", title: "Finance & Acct Staff", parent: "fin_mgr", type: "staff", x: 550, y: 490 },
-            { id: "sr_purchasing", name: "Putri Natasya", title: "Senior Purchasing", parent: "fin_mgr", type: "staff", x: 800, y: 490 },
-            
-            // UNDER SR PURCHASING (PUTRI NATASYA)
-            { id: "purchasing_staff", name: "Siti Mayrina Nurazizah", title: "Purchasing Staff", parent: "fin_mgr", type: "staff", x: 670, y: 690 },
+            { id: "sr_purchasing", name: "Putri Natasya", title: "Senior Purchasing", parent: "fin_mgr", type: "senior_staff", x: 714, y: 490 },
+            { id: "fin_staff", name: "Rahma Virani Lintang Utomo", title: "Finance & Acct Staff", parent: "fin_mgr", type: "junior_staff", x: 587, y: 690 },
+            { id: "purchasing_staff", name: "Siti Mayrina Nurazizah", title: "Purchasing Staff", parent: "fin_mgr", type: "junior_staff", x: 842, y: 690 },
 
             // UNDER COO (BUDI) - TIM 1 (ARIF)
-            { id: "pm_arif", name: "Arif Saifurrochim", title: "Project Manager", parent: "coo", type: "pm", x: 1574.29, y: 290 },
-            { id: "sm_helmy", name: "Helmy Setiawan", title: "Site Manager", parent: "pm_arif", type: "sm", x: 1345.41, y: 490 },
-            { id: "sm_imam", name: "Imam Yuddi P", title: "Site Manager", parent: "pm_arif", type: "sm", x: 1574.54, y: 490 },
-            { id: "pc_khoirus", name: "Khoirus Syahira", title: "Project Coordinator", parent: "pm_arif", type: "staff", x: 1800.76, y: 490 },
-            { id: "log_zulkifli", name: "Zulkifli", title: "Logistic Staff", parent: "sm_helmy", type: "staff", x: 1344.68, y: 690 },
-            { id: "log_yasin", name: "Yasin Muchamad Ilham", title: "Logistic Staff", parent: "sm_imam", type: "staff", x: 1574.67, y: 690 },
+            { id: "pm_arif", name: "Arif Saifurrochim", title: "Project Manager", parent: "coo", type: "manager", x: 1620, y: 290 },
+            { id: "sm_helmy", name: "Helmy Setiawan", title: "Site Manager", parent: "pm_arif", type: "senior_staff", x: 1390, y: 490 },
+            { id: "sm_imam", name: "Imam Yuddi P", title: "Site Manager", parent: "pm_arif", type: "senior_staff", x: 1620, y: 490 },
+            { id: "pc_khoirus", name: "Khoirus Syahira", title: "Project Coordinator", parent: "pm_arif", type: "senior_staff", x: 1850, y: 490 },
+            { id: "log_zulkifli", name: "Zulkifli", title: "Logistic Staff", parent: "sm_helmy", type: "junior_staff", x: 1390, y: 690 },
+            { id: "log_yasin", name: "Yasin Muchamad Ilham", title: "Logistic Staff", parent: "sm_imam", type: "junior_staff", x: 1620, y: 690 },
 
             // UNDER COO - TIM 2 (REZA)
-            { id: "pm_reza", name: "Muhammad Reza Pahlevi H.", title: "Project Manager", parent: "coo", type: "pm", x: 2382.24, y: 290 },
-            { id: "sm_trias", name: "Trias Kusuma Nugraha", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2041.5, y: 490 },
-            { id: "sm_barkah", name: "Barkah Tri Abdi", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2270.85, y: 490 },
-            { id: "sm_denny", name: "Denny Fitrianto Saidi", title: "Site Manager", parent: "pm_reza", type: "sm", x: 2499.86, y: 490 },
-            { id: "pc_ayufy", name: "Ayufy Riska Helmida", title: "Project Coordinator", parent: "pm_reza", type: "staff", x: 2727.64, y: 490 },
-            { id: "log_tri", name: "Tri Aditya Setiawan", title: "Logistic Staff", parent: "sm_trias", type: "staff", x: 2043.19, y: 690 },
-            { id: "node_1793261616885", name: "Tomy Rizki Gumilar", title: "Logistic Staff", parent: "sm_denny", type: "staff", x: 2500.15, y: 690 },
-            { id: "node_1793261642469", name: "Agung Satryo Leksono", title: "Logistic Staff", parent: "sm_barkah", type: "staff", x: 2271.3, y: 690 },
+            { id: "pm_reza", name: "Muhammad Reza Pahlevi H.", title: "Project Manager", parent: "coo", type: "manager", x: 2435, y: 290 },
+            { id: "sm_trias", name: "Trias Kusuma Nugraha", title: "Site Manager", parent: "pm_reza", type: "senior_staff", x: 2090, y: 490 },
+            { id: "sm_barkah", name: "Barkah Tri Abdi", title: "Site Manager", parent: "pm_reza", type: "senior_staff", x: 2320, y: 490 },
+            { id: "sm_denny", name: "Denny Fitrianto Saidi", title: "Site Manager", parent: "pm_reza", type: "senior_staff", x: 2550, y: 490 },
+            { id: "pc_ayufy", name: "Ayufy Riska Helmida", title: "Project Coordinator", parent: "pm_reza", type: "senior_staff", x: 2780, y: 490 },
+            { id: "log_tri", name: "Tri Aditya Setiawan", title: "Logistic Staff", parent: "sm_trias", type: "junior_staff", x: 2090, y: 690 },
+            { id: "log_agung", name: "Agung Satryo Leksono", title: "Logistic Staff", parent: "sm_barkah", type: "junior_staff", x: 2320, y: 690 },
+            { id: "log_tomy", name: "Tomy Rizki Gumilar", title: "Logistic Staff", parent: "sm_denny", type: "junior_staff", x: 2550, y: 690 },
 
             // UNDER COO - TIM 3 (TONI)
-            { id: "pm_toni", name: "Toni Oki Pratama", title: "Jr Project Manager", parent: "coo", type: "pm", x: 2883.66, y: 290 },
-            { id: "sm_idris", name: "Idris Albawavi", title: "Site Manager", parent: "pm_toni", type: "sm", x: 3005.18, y: 490 },
-            { id: "sm_ismawan", name: "Ismawan Adhi Ramadhan", title: "Site Manager", parent: "pm_toni", type: "sm", x: 3235.41, y: 490 },
-            { id: "pc_rahma", name: "Rahma Dwi Nur Hijriah", title: "Project Coordinator", parent: "pm_toni", type: "staff", x: 3462.89, y: 490 },
-            { id: "log_hanif", name: "Muhammad Hanif", title: "Logistic Staff", parent: "pm_toni", type: "staff", x: 3015, y: 690 },
+            { id: "pm_toni", name: "Toni Oki Pratama", title: "Jr Project Manager", parent: "coo", type: "manager", x: 2930, y: 290 },
+            { id: "sm_idris", name: "Idris Albawavi", title: "Site Manager", parent: "pm_toni", type: "senior_staff", x: 3070, y: 490 },
+            { id: "sm_ismawan", name: "Ismawan Adhi Ramadhan", title: "Site Manager", parent: "pm_toni", type: "senior_staff", x: 3300, y: 490 },
+            { id: "pc_rahma", name: "Rahma Dwi Nur Hijriah", title: "Project Coordinator", parent: "pm_toni", type: "senior_staff", x: 3530, y: 490 },
+            { id: "log_hanif", name: "Muhammad Hanif", title: "Logistic Staff", parent: "pm_toni", type: "junior_staff", x: 2930, y: 690 },
 
             // UNDER COO - TIM 4 (TOPO)
-            { id: "pm_sutopo", name: "Sutopo", title: "Senior Site Manager", parent: "coo", type: "pm", x: 3816.21, y: 290 },
-            { id: "sm_reza_a", name: "Reza Afrilianto", title: "Site Manager", parent: "pm_sutopo", type: "sm", x: 3707.31, y: 490 },
-            { id: "pc_anik", name: "Anik Purmiati", title: "Project Coordinator", parent: "pm_sutopo", type: "staff", x: 3927.83, y: 490 },
-            { id: "log_ian", name: "Ian Setiawan", title: "Logistic Staff", parent: "sm_reza_a", type: "staff", x: 3707.31, y: 690 }
+            { id: "pm_sutopo", name: "Sutopo", title: "Senior Site Manager", parent: "coo", type: "manager", x: 3895, y: 290 },
+            { id: "sm_reza_a", name: "Reza Afrilianto", title: "Site Manager", parent: "pm_sutopo", type: "senior_staff", x: 3780, y: 490 },
+            { id: "pc_anik", name: "Anik Purmiati", title: "Project Coordinator", parent: "pm_sutopo", type: "senior_staff", x: 4010, y: 490 },
+            { id: "log_ian", name: "Ian Setiawan", title: "Logistic Staff", parent: "sm_reza_a", type: "junior_staff", x: 3780, y: 690 }
         ];
 
         // Load data from LocalStorage or Fallback
@@ -514,6 +578,17 @@
             });
         }
 
+        // Toast kecil di bawah layar, pengganti alert()
+        let toastTimer = null;
+        function showToast(message) {
+            const el = document.getElementById('toast');
+            if (!el) return;
+            el.textContent = message;
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+        }
+
         // Custom Modal Confirmation Helper
         let onConfirmCallback = null;
 
@@ -524,7 +599,6 @@
                 confirmText.innerText = message;
                 onConfirmCallback = onConfirm;
                 confirmModal.classList.remove('hidden');
-                if (window.lucide) lucide.createIcons();
             }
         }
 
@@ -556,20 +630,20 @@
             });
         }
 
-        // Snap Y position to nearest level swimlane center
+        // Snap Y position to nearest level swimlane center and update type accordingly
         function snapToNearestLevelY(y) {
-            let closestCenter = LEVEL_ZONES[0].centerY;
-            let minDiff = Math.abs(y - closestCenter);
+            let closestZone = LEVEL_ZONES[0];
+            let minDiff = Math.abs(y - closestZone.centerY);
 
             LEVEL_ZONES.forEach(zone => {
                 const diff = Math.abs(y - zone.centerY);
                 if (diff < minDiff) {
                     minDiff = diff;
-                    closestCenter = zone.centerY;
+                    closestZone = zone;
                 }
             });
 
-            return closestCenter;
+            return closestZone;
         }
 
         function clearMultiSelection() {
@@ -588,15 +662,31 @@
             });
         }
 
+        // Map node Y-level or type to CSS class to guarantee border color
+        function getNodeClassType(item) {
+            if (item.type === 'vacant') return 'node-vacant';
+            if (item.type === 'bod') return 'node-bod';
+            
+            // Auto map Y coordinate to appropriate level color if type is custom or missing
+            const zone = snapToNearestLevelY(item.y);
+            return `node-${zone.id}`;
+        }
+
+        // Update class sebuah node in place (tanpa membuat ulang elemennya)
+        function applyNodeClasses(nodeEl, item) {
+            nodeEl.className = `org-node ${getNodeClassType(item)}${selectedNodeIds.has(item.id) ? ' multi-selected' : ''}`;
+        }
+
         // Render All Nodes on Canvas
         function renderNodes() {
             if (!container) return;
             container.innerHTML = '';
 
             orgData.forEach(item => {
+                const classType = getNodeClassType(item);
                 const node = document.createElement('div');
                 node.id = `node-${item.id}`;
-                node.className = `org-node node-${item.type} ${selectedNodeIds.has(item.id) ? 'multi-selected' : ''}`;
+                node.className = `org-node ${classType} ${selectedNodeIds.has(item.id) ? 'multi-selected' : ''}`;
                 node.style.left = `${item.x}px`;
                 node.style.top = `${item.y}px`;
                 node.setAttribute('data-name', item.name.toLowerCase());
@@ -605,7 +695,7 @@
                 node.innerHTML = `
                     <div class="node-actions">
                         <button onclick="openEditModal('${item.id}')" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
-                            <i data-lucide="pencil" class="w-3 h-3"></i>
+                            <svg class="w-3 h-3 ic" aria-hidden="true"><use href="#i-pencil"/></svg>
                         </button>
                     </div>
                     <div class="font-bold text-xs truncate max-w-full px-1">${item.name}</div>
@@ -628,7 +718,6 @@
                 container.appendChild(node);
             });
 
-            if (window.lucide) lucide.createIcons();
             updateConnectors();
         }
 
@@ -691,8 +780,18 @@
             return pathsSvg;
         }
 
+        // Lebarkan kanvas kalau ada node yang melewati batas awal (4500px), supaya garis konektor tidak terpotong
+        function ensureCanvasWidth() {
+            const area = document.getElementById('chartArea');
+            if (!area) return;
+            const needed = Math.max(4500, ...orgData.map(d => d.x + 210 + 200));
+            const next = Math.ceil(needed) + 'px';
+            if (area.style.width !== next) area.style.width = next;
+        }
+
         function updateConnectors() {
             if (!svg) return;
+            ensureCanvasWidth();
             svg.innerHTML = `
                 <defs>
                     <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -703,17 +802,17 @@
             `;
         }
 
-        // Draggable Functionality
+        // Draggable Functionality.
+        // Penting: node TIDAK boleh di-render ulang saat klik biasa. Kalau elemen diganti di antara
+        // dua klik, browser tidak akan pernah mengirim event dblclick. Jadi drag baru dianggap
+        // drag setelah pointer bergeser melewati threshold, dan update tampilan dilakukan in place.
         function makeDraggable(element, id) {
-            let isDragging = false;
-            let startX, startY;
-            let initialPositions = {};
+            const DRAG_THRESHOLD = 4; // px layar
 
             element.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
                 if (isConnectingMode || e.target.closest('.node-actions')) return;
                 e.stopPropagation();
-
-                saveStateToHistory();
 
                 if (!selectedNodeIds.has(id) && !e.shiftKey) {
                     clearMultiSelection();
@@ -724,23 +823,33 @@
                     updateSelectedNodeClasses();
                 }
 
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const initialPositions = {};
+                let isDragging = false;
 
-                selectedNodeIds.forEach(selectedId => {
-                    const nodeData = orgData.find(d => d.id === selectedId);
-                    if (nodeData) {
-                        initialPositions[selectedId] = { x: nodeData.x, y: nodeData.y };
-                        const nodeEl = document.getElementById(`node-${selectedId}`);
-                        if (nodeEl) nodeEl.classList.add('dragging');
+                function beginDrag() {
+                    isDragging = true;
+                    saveStateToHistory();
+
+                    selectedNodeIds.forEach(selectedId => {
+                        const nodeData = orgData.find(d => d.id === selectedId);
+                        if (nodeData) {
+                            initialPositions[selectedId] = { x: nodeData.x, y: nodeData.y };
+                            const nodeEl = document.getElementById(`node-${selectedId}`);
+                            if (nodeEl) nodeEl.classList.add('dragging');
+                        }
+                    });
+                }
+
+                function onMouseMove(ev) {
+                    if (!isDragging) {
+                        if (Math.abs(ev.clientX - startX) < DRAG_THRESHOLD && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
+                        beginDrag();
                     }
-                });
 
-                function onMouseMove(e) {
-                    if (!isDragging) return;
-                    const dx = (e.clientX - startX) / zoomScale;
-                    const dy = (e.clientY - startY) / zoomScale;
+                    const dx = (ev.clientX - startX) / zoomScale;
+                    const dy = (ev.clientY - startY) / zoomScale;
 
                     selectedNodeIds.forEach(selectedId => {
                         const nodeData = orgData.find(d => d.id === selectedId);
@@ -761,27 +870,32 @@
                 }
 
                 function onMouseUp() {
-                    if (isDragging) {
-                        isDragging = false;
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
 
-                        selectedNodeIds.forEach(selectedId => {
-                            const nodeData = orgData.find(d => d.id === selectedId);
-                            if (nodeData) {
-                                nodeData.y = snapToNearestLevelY(nodeData.y);
-                                const nodeEl = document.getElementById(`node-${selectedId}`);
-                                if (nodeEl) {
-                                    nodeEl.style.top = `${nodeData.y}px`;
-                                    nodeEl.classList.remove('dragging');
-                                }
+                    // Klik biasa (tanpa geser): jangan sentuh DOM sama sekali, biar dblclick bisa jalan.
+                    if (!isDragging) return;
+                    isDragging = false;
+
+                    selectedNodeIds.forEach(selectedId => {
+                        const nodeData = orgData.find(d => d.id === selectedId);
+                        if (nodeData) {
+                            const nearestZone = snapToNearestLevelY(nodeData.y);
+                            nodeData.y = nearestZone.centerY;
+                            if (nodeData.type !== 'vacant') {
+                                nodeData.type = nearestZone.id;
                             }
-                        });
 
-                        updateConnectors();
-                        autoSaveToLocalStorage();
+                            const nodeEl = document.getElementById(`node-${selectedId}`);
+                            if (nodeEl) {
+                                nodeEl.style.top = `${nodeData.y}px`;
+                                applyNodeClasses(nodeEl, nodeData);
+                            }
+                        }
+                    });
 
-                        document.removeEventListener('mousemove', onMouseMove);
-                        document.removeEventListener('mouseup', onMouseUp);
-                    }
+                    updateConnectors();
+                    autoSaveToLocalStorage();
                 }
 
                 document.addEventListener('mousemove', onMouseMove);
@@ -828,12 +942,12 @@
                 });
             } else {
                 if (connectChildId === nodeId) {
-                    alert("Sebuah node tidak bisa menjadi atasan untuk dirinya sendiri.");
+                    showToast("Sebuah node tidak bisa menjadi atasan untuk dirinya sendiri.");
                     return;
                 }
 
                 if (isDescendant(connectChildId, nodeId)) {
-                    alert("Tidak dapat menghubungkan! Hal ini akan menyebabkan siklus/looping melingkar.");
+                    showToast("Tidak dapat menghubungkan! Hal ini akan menyebabkan siklus/looping melingkar.");
                     return;
                 }
 
@@ -867,8 +981,12 @@
             return item ? item.name : id;
         }
 
+        // Title Case capitalization helper function
         function toTitleCase(str) {
-            return str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function(a) { return a.toUpperCase(); });
+            if (!str) return '';
+            return str.replace(/\w\S*/g, function(txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            });
         }
 
         function populateTitleDropdown(selectedTitle = '') {
@@ -903,7 +1021,6 @@
             }
         }
 
-        // Keep nodes snapped to their original swimlane, including vacant positions.
         function getCenterYForLevel(levelType) {
             const zone = LEVEL_ZONES.find(z => z.id === levelType);
             return zone ? zone.centerY : LEVEL_ZONES[LEVEL_ZONES.length - 1].centerY;
@@ -956,7 +1073,121 @@
                 vacantCheckbox.checked = false;
             }
 
+            syncVacantUi();
+
             modal.classList.remove('hidden');
+        }
+
+        // Ubah huruf jadi Title Case sambil menjaga posisi kursor
+        function titleCaseInput(el) {
+            el.classList.remove('border-red-500');
+            const pos = el.selectionStart;
+            const next = toTitleCase(el.value);
+            if (next !== el.value) {
+                el.value = next;
+                try { el.setSelectionRange(pos, pos); } catch (e) { /* abaikan */ }
+            }
+        }
+
+        // Posisi Vacant: nama orang tidak dipakai (nama otomatis "Jabatan (Vacant)"),
+        // jadi kolom nama dimatikan. Kalau dicentang lalu dilepas, nama dikosongkan supaya diisi orang sebenarnya.
+        function syncVacantUi() {
+            const vacant = document.getElementById('modalIsVacant').checked;
+            const nameInput = document.getElementById('modalName');
+            nameInput.disabled = vacant;
+            nameInput.classList.toggle('opacity-50', vacant);
+            nameInput.classList.remove('border-red-500');
+            nameInput.placeholder = vacant ? 'Otomatis: nama jabatan + (Vacant)' : 'Contoh: Budi Setiawan';
+            if (!vacant && /\(vacant\)\s*$/i.test(nameInput.value)) nameInput.value = '';
+        }
+
+        // Cari x terdekat di level y yang tidak menimpa node lain (jarak minimal 20px).
+        // Kalau posisi yang diminta sudah kosong, dipakai apa adanya (posisi tidak digeser).
+        // Kalau satu baris sudah penuh, node ditaruh di ujung kanan baris (kanvas ikut melebar).
+        function findFreeX(selfId, y, preferredX) {
+            const W = 210, GAP = 20, STEP = 10;
+            const others = orgData.filter(d => d.id !== selfId && d.y === y);
+            const isFree = (x) => others.every(o => x + W + GAP <= o.x || o.x + W + GAP <= x);
+            const start = Math.max(0, preferredX);
+            if (isFree(start)) return start;
+            const rowEnd = others.reduce((max, o) => Math.max(max, o.x + W + GAP), 0);
+            for (let d = STEP; start + d <= rowEnd + STEP; d += STEP) {
+                if (isFree(start + d)) return start + d;
+                if (start - d >= 0 && isFree(start - d)) return start - d;
+            }
+            return Math.max(rowEnd, start);
+        }
+
+        // Simpan dari modal. Dipanggil oleh tombol Simpan dan tombol Enter.
+        function saveNodeFromModal() {
+            const titleSelectEl = document.getElementById('modalTitleSelect');
+            const customTitleInputEl = document.getElementById('modalCustomTitleInput');
+            const nameInputEl = document.getElementById('modalName');
+
+            const id = document.getElementById('modalNodeId').value;
+            const isVacant = document.getElementById('modalIsVacant').checked;
+
+            let title = titleSelectEl.value;
+            if (title === '__NEW_TITLE__') {
+                title = toTitleCase(customTitleInputEl.value.trim());
+                if (!title) {
+                    showToast('Silakan masukkan nama posisi baru.');
+                    customTitleInputEl.focus();
+                    return false;
+                }
+            }
+
+            let name = toTitleCase(nameInputEl.value).replace(/\s*\(vacant\)\s*$/i, '').trim();
+            if (isVacant) {
+                name = `${title} (Vacant)`;
+            } else if (!name) {
+                nameInputEl.classList.add('border-red-500');
+                showToast('Nama lengkap wajib diisi, atau centang Posisi Kosong (Vacant).');
+                nameInputEl.focus();
+                return false;
+            }
+
+            const selectedLevel = document.getElementById('modalTypeSelect').value;
+            const type = isVacant ? 'vacant' : selectedLevel;
+            const parent = document.getElementById('modalParentSelect').value || null;
+            const targetY = getCenterYForLevel(selectedLevel);
+
+            if (id) {
+                const item = orgData.find(d => d.id === id);
+                if (!item) { closeModal(); return false; }
+                if (parent && (parent === id || isDescendant(id, parent))) {
+                    showToast('Atasan tidak valid: atasan tidak boleh bawahannya sendiri (akan membuat siklus).');
+                    return false;
+                }
+                saveStateToHistory();
+                item.name = name;
+                item.title = title;
+                item.parent = parent;
+                item.type = type;
+                if (item.y !== targetY) {
+                    // pindah level: x dipertahankan kalau kosong, kalau tidak digeser ke slot kosong terdekat
+                    item.y = targetY;
+                    item.x = findFreeX(item.id, targetY, item.x);
+                }
+            } else {
+                saveStateToHistory();
+                const newId = 'node_' + Date.now();
+                const visibleCenterX = ((viewport ? viewport.clientWidth : 1200) / 2 - panX) / zoomScale - 105;
+                orgData.push({
+                    id: newId,
+                    name: name,
+                    title: title,
+                    parent: parent,
+                    type: type,
+                    x: findFreeX(newId, targetY, visibleCenterX),
+                    y: targetY
+                });
+            }
+
+            closeModal();
+            renderNodes();
+            autoSaveToLocalStorage();
+            return true;
         }
 
         function closeModal() {
@@ -1013,12 +1244,18 @@
                         nameColor = "#ffffff";
                         titleColor = "#cbd5e1";
                     } else if (item.type === 'manager') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#8b5cf6" />`;
-                    else if (item.type === 'pm') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#f59e0b" />`;
-                    else if (item.type === 'sm') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#10b981" />`;
-                    else if (item.type === 'staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#3b82f6" />`;
+                    else if (item.type === 'senior_staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#0284c7" />`;
+                    else if (item.type === 'junior_staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#10b981" />`;
                     else if (item.type === 'vacant') {
                         bgFill = "#fffbe8";
                         strokeColor = "#f59e0b";
+                    } else {
+                        // Fallback accent bar color according to level
+                        const levelZone = snapToNearestLevelY(item.y);
+                        let barColor = "#10b981";
+                        if (levelZone.id === 'manager') barColor = "#8b5cf6";
+                        if (levelZone.id === 'senior_staff') barColor = "#0284c7";
+                        accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="${barColor}" />`;
                     }
 
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1081,7 +1318,7 @@
                 img.src = dataUrl;
             } catch (err) {
                 console.error("Export PNG Error:", err);
-                alert("Terjadi kesalahan saat mengunduh gambar.");
+                showToast("Terjadi kesalahan saat mengunduh gambar.");
             }
         }
 
@@ -1122,7 +1359,7 @@
                 };
             }
 
-            // Search Input
+            // Search Input with dynamic high-visibility pulsing highlight
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 searchInput.addEventListener('input', (e) => {
@@ -1168,8 +1405,7 @@
             const redoBtn = document.getElementById('redoBtn');
             if (redoBtn) redoBtn.addEventListener('click', redo);
 
-            // Keyboard shortcuts for application history.
-            // Keep native text-editing undo/redo available inside form fields.
+            // Keyboard shortcuts
             document.addEventListener('keydown', (e) => {
                 const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
                 const primaryModifier = isMac ? e.metaKey : e.ctrlKey;
@@ -1213,7 +1449,7 @@
             const exportPngBtn = document.getElementById('exportPngBtn');
             if (exportPngBtn) exportPngBtn.addEventListener('click', exportChartToPng);
 
-            // Form Submit Listener
+            // Form Submit Listener & Auto-Capitalization On-The-Fly
             const nodeForm = document.getElementById('nodeForm');
             const titleSelectEl = document.getElementById('modalTitleSelect');
             const customTitleInputEl = document.getElementById('modalCustomTitleInput');
@@ -1228,73 +1464,36 @@
                         customTitleInputEl.classList.add('hidden');
                     }
                 });
+
+                customTitleInputEl.addEventListener('input', (e) => {
+                    titleCaseInput(e.target);
+                });
             }
 
             if (nameInputEl) {
-                nameInputEl.addEventListener('blur', (e) => {
-                    e.target.value = toTitleCase(e.target.value);
+                nameInputEl.addEventListener('input', (e) => {
+                    titleCaseInput(e.target);
                 });
             }
 
             if (nodeForm) {
-                nodeForm.addEventListener('submit', (e) => {
+                // Di preview/iframe sandbox, submit form diblokir browser. Jadi tombol Simpan dan
+                // tombol Enter ditangani manual lewat saveNodeFromModal(), bukan lewat event submit.
+                nodeForm.addEventListener('submit', (e) => e.preventDefault());
+                nodeForm.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter') return;
+                    const tag = e.target && e.target.tagName;
+                    if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'TEXTAREA') return;
                     e.preventDefault();
-                    saveStateToHistory();
-
-                    const id = document.getElementById('modalNodeId').value;
-                    const rawName = document.getElementById('modalName').value;
-                    const isVacant = document.getElementById('modalIsVacant').checked;
-                    
-                    let title = titleSelectEl.value;
-                    if (title === '__NEW_TITLE__') {
-                        title = customTitleInputEl.value.trim();
-                        if (!title) {
-                            alert("Silakan masukkan nama posisi baru.");
-                            return;
-                        }
-                    }
-
-                    let name = toTitleCase(rawName);
-                    // The selected area level is separate from the visual vacant state.
-                    // This prevents a vacant node from losing its original level.
-                    const selectedLevel = document.getElementById('modalTypeSelect').value;
-                    const type = isVacant ? 'vacant' : selectedLevel;
-
-                    if (isVacant) {
-                        name = `${title} (Vacant)`;
-                    } else {
-                        name = name.replace(/\s*\(vacant\)\s*$/i, '').trim();
-                    }
-
-                    const parent = document.getElementById('modalParentSelect').value || null;
-                    const targetY = getCenterYForLevel(selectedLevel);
-
-                    if (id) {
-                        const item = orgData.find(d => d.id === id);
-                        if (!item) return;
-                        item.name = name;
-                        item.title = title;
-                        item.parent = parent;
-                        item.type = type;
-                        item.y = targetY;
-                    } else {
-                        const newId = 'node_' + Date.now();
-                        orgData.push({
-                            id: newId,
-                            name: name,
-                            title: title,
-                            parent: parent,
-                            type: type,
-                            x: Math.abs(panX) + 500,
-                            y: targetY
-                        });
-                    }
-
-                    closeModal();
-                    renderNodes();
-                    autoSaveToLocalStorage();
+                    saveNodeFromModal();
                 });
             }
+
+            const saveNodeBtn = document.getElementById('saveNodeBtn');
+            if (saveNodeBtn) saveNodeBtn.addEventListener('click', saveNodeFromModal);
+
+            const vacantCheckboxEl = document.getElementById('modalIsVacant');
+            if (vacantCheckboxEl) vacantCheckboxEl.addEventListener('change', syncVacantUi);
 
             // Canvas Panning & Drag Selection
             let isPanning = false;
