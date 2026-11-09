@@ -109,6 +109,23 @@
             transition: border-color 0.15s, box-shadow 0.15s, transform 0.2s ease-in-out;
         }
 
+        /* Pengunjung yang belum masuk hanya melihat. Tombol ubah disembunyikan dari awal
+           supaya tidak sempat muncul sebelum skrip tahu status masuk. */
+        body:not(.can-edit) .edit-only {
+            display: none !important;
+        }
+        body:not(.can-edit) .org-node,
+        body:not(.can-edit) .org-node:hover {
+            cursor: grab;
+        }
+        body:not(.can-edit) #viewport.grabbing,
+        body:not(.can-edit) #viewport.grabbing .org-node {
+            cursor: grabbing;
+        }
+        body:not(.can-edit) .node-actions {
+            display: none !important;
+        }
+
         .org-node:hover {
             border-color: #6366f1;
             box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.2);
@@ -286,11 +303,12 @@
                     <span id="syncDot" class="w-1.5 h-1.5 rounded-full shrink-0 bg-sky-400"></span>
                     <span id="syncStatusText">Memuat bagan cloud...</span>
                 </div>
+                <p id="lastUpdatedText" class="hidden text-[11px] font-semibold text-slate-600 leading-tight mt-0.5" title="Waktu pembaruan bagan resmi di cloud, zona Asia/Jakarta"></p>
             </div>
         </div>
 
         <!-- Mode Indicator / Banner -->
-        <div id="connectBanner" class="hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 animate-pulse">
+        <div id="connectBanner" class="edit-only hidden bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 animate-pulse">
             <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-link"/></svg>
             <span id="connectBannerText">Langkah 1: Klik Kotak Bawahan (Child Node)</span>
             <button id="cancelConnectBtn" class="text-amber-900 underline hover:text-black ml-2 text-[11px]">Batal</button>
@@ -298,7 +316,7 @@
 
         <div class="flex items-center flex-wrap gap-3 max-w-full">
             <div class="flex items-center gap-2">
-                <button type="button" id="authBtn" title="Masuk untuk menyimpan perubahan ke cloud" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition shadow-sm">
+                <button type="button" id="authBtn" title="Masuk untuk mengubah dan menyimpan bagan" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-log-in"/></svg>
                     <span id="authBtnLabel" class="max-w-[14rem] truncate">Masuk</span>
                 </button>
@@ -319,23 +337,24 @@
                 <button id="zoomInBtn" title="Zoom In (+)" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm">
                     <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-zoom-in"/></svg>
                 </button>
-                <button id="resetViewBtn" title="Reset Pandangan / Center" class="p-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm ml-1 border-l border-slate-200">
+                <button type="button" id="resetViewBtn" title="Tampilkan seluruh bagan di layar" aria-label="Tampilkan seluruh bagan di layar" class="px-2 py-1.5 hover:bg-white text-slate-700 rounded-md transition shadow-sm ml-1 border-l border-slate-200 inline-flex items-center gap-1">
                     <svg class="w-4 h-4 ic" aria-hidden="true"><use href="#i-maximize-2"/></svg>
+                    <span>Semua</span>
                 </button>
             </div>
 
             <!-- Toolbar Controls -->
             <div class="flex items-center flex-wrap bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1 max-w-full">
-                <button id="undoBtn" title="Undo Langkah (Cmd+Z / Ctrl+Z)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                <button id="undoBtn" title="Undo Langkah (Cmd+Z / Ctrl+Z)" class="edit-only px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-slate-600 ic" aria-hidden="true"><use href="#i-undo-2"/></svg> Undo
                 </button>
-                <button id="redoBtn" title="Redo Langkah (Cmd+Shift+Z / Ctrl+Y)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                <button id="redoBtn" title="Redo Langkah (Cmd+Shift+Z / Ctrl+Y)" class="edit-only px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-slate-600 ic" aria-hidden="true"><use href="#i-redo-2"/></svg> Redo
                 </button>
-                <button id="connectModeBtn" title="Ubah Relasi Pelaporan / Konektor" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                <button id="connectModeBtn" title="Ubah Relasi Pelaporan / Konektor" class="edit-only px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-git-fork"/></svg> Ubah Atasan
                 </button>
-                <button id="addNodeBtn" title="Tambah Personil Baru" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                <button id="addNodeBtn" title="Tambah Personil Baru" class="edit-only px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-user-plus"/></svg> Tambah Node
                 </button>
                 <button id="exportPngBtn" title="Unduh Gambar PNG" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
@@ -453,7 +472,7 @@
                 <button type="button" id="closeLoginBtn" class="text-slate-400 hover:text-slate-600" aria-label="Tutup"><svg class="w-5 h-5 ic" aria-hidden="true"><use href="#i-x"/></svg></button>
             </div>
             <form id="loginForm" class="p-6 space-y-4">
-                <p class="text-xs text-slate-600 leading-relaxed">Bagan terbaru tetap bisa dilihat tanpa masuk. Perubahan masuk ke cloud hanya untuk akun STK yang aktif, supaya bagan yang sama muncul di setiap perangkat.</p>
+                <p class="text-xs text-slate-600 leading-relaxed">Bagan resmi bisa dilihat tanpa masuk. Untuk mengubah bagan dan menyimpannya ke cloud, masuk dengan akun STK yang aktif.</p>
                 <div>
                     <label for="loginEmail" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Email</label>
                     <input type="email" id="loginEmail" autocomplete="username" required placeholder="nama@perusahaan.com" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
@@ -593,6 +612,7 @@
         }
 
         function undo() {
+            if (!canEdit()) return;
             if (historyStack.length > 0) {
                 redoStack.push(JSON.stringify(orgData));
                 const previousState = historyStack.pop();
@@ -603,6 +623,7 @@
         }
 
         function redo() {
+            if (!canEdit()) return;
             if (redoStack.length > 0) {
                 historyStack.push(JSON.stringify(orgData));
                 const nextState = redoStack.pop();
@@ -614,6 +635,9 @@
 
         function autoSaveToLocalStorage(options) {
             const skipCloud = !!(options && options.skipCloud);
+            // Tanpa masuk, interaksi tidak boleh menulis salinan yang berbeda dari bagan resmi.
+            // skipCloud hanya dipakai saat menyalin bagan cloud ke cache baca.
+            if (!canEdit() && !skipCloud) return;
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(orgData));
             } catch (e) {
@@ -648,6 +672,7 @@
         let authSession = null;
         let cloudFingerprint = null;
         let cloudUpdatedAt = null;
+        let officialChart = null;
         let cloudReady = false;
         let bootFinished = false;
         let bootPainted = false;
@@ -667,6 +692,14 @@
         let realtimeChannel = null;
         let reconcileChain = Promise.resolve();
         let defaultChartFingerprint = null;
+        let authEpoch = 0;
+        let editUiApplied = null;
+        let userAdjustedView = false;
+        let sawOfficialChart = false;
+
+        function canEdit() {
+            return !!(authSession && authSession.user);
+        }
 
         function chartFingerprint(data) {
             if (!Array.isArray(data)) return '';
@@ -721,6 +754,9 @@
             mirroredFp
         }) {
             if (!cloudFp) return { action: 'keep-device', status: 'offline' };
+            // Pengunjung yang belum masuk selalu mengikuti bagan cloud. Salinan perangkat
+            // tidak dijadikan versi saingan, dan dialog pilih versi tidak ditampilkan.
+            if (!signedIn) return { action: 'use-cloud' };
             if (deviceFp === cloudFp) return { action: 'use-cloud' };
             if (mirrored && !edited) return { action: 'use-cloud' };
             if (mirrored && edited && mirroredFp && cloudFp === mirroredFp) {
@@ -785,20 +821,42 @@
             try { localStorage.removeItem(HOLD_KEY); } catch (e) { /* abaikan */ }
         }
 
-        function rememberSynced(fp, updatedAt) {
+        function rememberSynced(fp, updatedAt, data) {
             cloudFingerprint = fp;
             cloudUpdatedAt = updatedAt || cloudUpdatedAt;
+            if (Array.isArray(data)) officialChart = JSON.parse(JSON.stringify(data));
             try {
                 localStorage.setItem(META_KEY, JSON.stringify({
                     cloudFp: fp,
                     cloudUpdatedAt: cloudUpdatedAt
                 }));
             } catch (e) { /* abaikan */ }
+            updateLastUpdatedLabel();
         }
 
         function rememberCloudBase(fp, updatedAt) {
             cloudFingerprint = fp;
             if (updatedAt) cloudUpdatedAt = updatedAt;
+            updateLastUpdatedLabel();
+        }
+
+        function noteOfficialChart(data, updatedAt) {
+            if (Array.isArray(data)) officialChart = JSON.parse(JSON.stringify(data));
+            if (updatedAt) cloudUpdatedAt = updatedAt;
+            updateLastUpdatedLabel();
+        }
+
+        // Cache offline hanya dihitung sebagai bagan resmi bila sidik jarinya masih sama
+        // dengan pembaruan cloud terakhir. Kalau tidak, jangan tampilkan tanggal yang dikarang.
+        function hydrateOfficialMetaFromCache() {
+            const meta = readMeta();
+            const cache = readDeviceCache();
+            if (!meta || !cache.present || !Array.isArray(cache.data)) return false;
+            if (chartFingerprint(cache.data) !== meta.cloudFp) return false;
+            cloudFingerprint = meta.cloudFp;
+            cloudUpdatedAt = meta.cloudUpdatedAt || null;
+            officialChart = JSON.parse(JSON.stringify(cache.data));
+            return true;
         }
 
         function replaceOrgData(next, options) {
@@ -809,6 +867,9 @@
             }
             renderNodes();
             autoSaveToLocalStorage({ skipCloud: true });
+            const fit = options && options.fit;
+            if (fit === 'force') autoFitChart('force');
+            else if (fit !== 'skip') autoFitChart('official');
         }
 
         function formatWhen(iso) {
@@ -816,10 +877,32 @@
             const date = new Date(iso);
             if (Number.isNaN(date.getTime())) return '';
             try {
-                return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+                return new Intl.DateTimeFormat('id-ID', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                    timeZone: 'Asia/Jakarta'
+                }).format(date);
             } catch (e) {
-                return date.toISOString();
+                return '';
             }
+        }
+
+        function lastUpdatedLabel(iso) {
+            const when = formatWhen(iso);
+            return when ? ('Terakhir diperbarui ' + when + ' WIB') : '';
+        }
+
+        function updateLastUpdatedLabel() {
+            const el = document.getElementById('lastUpdatedText');
+            if (!el) return;
+            const label = lastUpdatedLabel(cloudUpdatedAt);
+            if (!label) {
+                el.textContent = '';
+                el.classList.add('hidden');
+                return;
+            }
+            el.textContent = label;
+            el.classList.remove('hidden');
         }
 
         function updateSyncStatus(mode) {
@@ -842,11 +925,8 @@
             } else if (mode === 'error' || (cloudWriteBlocked && dirty)) {
                 label = lastSyncError || 'Gagal menyimpan ke cloud';
                 color = '#ef4444';
-            } else if (!authSession && dirty) {
-                label = 'Belum masuk — perubahan hanya di perangkat ini';
-                color = '#fbbf24';
             } else if (!authSession) {
-                label = 'Melihat bagan cloud · masuk untuk menyimpan';
+                label = 'Melihat bagan resmi · masuk untuk mengubah';
                 color = '#10b981';
             } else if (dirty) {
                 label = 'Perubahan belum terkirim';
@@ -858,6 +938,7 @@
 
             text.textContent = label;
             dot.style.backgroundColor = color;
+            updateLastUpdatedLabel();
         }
 
         function updateAuthUi() {
@@ -870,8 +951,31 @@
                 btn.title = 'Keluar dari akun ' + email;
             } else {
                 label.textContent = 'Masuk';
-                btn.title = 'Masuk untuk menyimpan perubahan ke cloud';
+                btn.title = 'Masuk untuk mengubah dan menyimpan bagan';
             }
+            updateEditModeUi();
+            if (bootFinished) updateSyncStatus();
+        }
+
+        function updateEditModeUi() {
+            const editing = canEdit();
+            document.body.classList.toggle('can-edit', editing);
+            document.querySelectorAll('.edit-only').forEach(el => {
+                if ('disabled' in el) el.disabled = !editing;
+            });
+            if (editUiApplied === editing) return;
+            const leavingEdit = editUiApplied === true && !editing;
+            editUiApplied = editing;
+            if (leavingEdit) {
+                if (isConnectingMode) toggleConnectMode();
+                closeModal();
+                closeConfirmModal();
+                clearMultiSelection();
+                historyStack = [];
+                redoStack = [];
+            }
+            // Saat keluar dan salinan resmi sudah ada, presentOfficialChart yang menggambar ulang.
+            if (bootPainted && container && !(leavingEdit && officialChart)) renderNodes();
         }
 
         function translateAuthError(error) {
@@ -909,6 +1013,10 @@
 
         function openChoiceModal(cloudRow) {
             if (!cloudRow || !Array.isArray(cloudRow.data)) return;
+            if (!canEdit()) {
+                chooseCloudVersion(cloudRow);
+                return;
+            }
             choiceOpen = true;
             pendingChoiceCloud = cloudRow;
             hideSyncBanner();
@@ -949,13 +1057,17 @@
             clearHold();
             hideSyncBanner();
             closeChoiceModal();
-            rememberSynced(chartFingerprint(cloud.data), cloud.updated_at);
-            replaceOrgData(cloud.data, { resetHistory: true });
+            rememberSynced(chartFingerprint(cloud.data), cloud.updated_at, cloud.data);
+            replaceOrgData(cloud.data, { resetHistory: true, fit: 'force' });
             updateSyncStatus('synced');
             showToast('Menampilkan bagan cloud.');
         }
 
         async function chooseDeviceVersion(cloud) {
+            if (!canEdit()) {
+                if (cloud) chooseCloudVersion(cloud);
+                return;
+            }
             if (cloud && cloud.updated_at) cloudUpdatedAt = cloud.updated_at;
             closeChoiceModal();
             hideSyncBanner();
@@ -994,6 +1106,7 @@
             if (!data) return null;
             const chart = coerceChart(data.data);
             if (!chart) throw new Error('Data bagan cloud tidak valid');
+            noteOfficialChart(chart, data.updated_at);
             return { id: data.id, data: chart, updated_at: data.updated_at };
         }
 
@@ -1091,6 +1204,8 @@
                 }
                 cloudUpdatedAt = result.updated_at || cloudUpdatedAt;
                 cloudFingerprint = snapshotFp;
+                officialChart = JSON.parse(JSON.stringify(snapshot));
+                updateLastUpdatedLabel();
                 if (chartFingerprint(orgData) === snapshotFp) {
                     clearHold();
                     rememberSynced(snapshotFp, cloudUpdatedAt);
@@ -1139,7 +1254,7 @@
                 deviceFp,
                 cloudFp,
                 defaultFp: getDefaultFingerprint(),
-                signedIn: !!authSession,
+                signedIn: context.forceSignedOut ? false : !!authSession,
                 editedDuringBoot: context.edited,
                 hold: readHold(),
                 mirrored: context.mirrored,
@@ -1148,9 +1263,11 @@
 
             if (decision.action === 'use-cloud') {
                 clearHold();
-                rememberSynced(cloudFp, cloudRow.updated_at);
+                rememberSynced(cloudFp, cloudRow.updated_at, cloudRow.data);
                 if (deviceFp !== cloudFp || !bootPainted) {
                     replaceOrgData(cloudRow.data, { resetHistory: deviceFp !== cloudFp });
+                } else {
+                    sawOfficialChart = true;
                 }
                 updateSyncStatus('synced');
                 return decision;
@@ -1176,9 +1293,12 @@
 
         async function pullAndReconcile() {
             if (!cloudClient) return;
+            const epoch = authEpoch;
+            const startedSignedIn = canEdit();
             if (choiceOpen && pendingChoiceCloud) {
                 try {
                     const fresh = await fetchCloudRow();
+                    if (epoch !== authEpoch || !choiceOpen) return;
                     if (fresh) {
                         pendingChoiceCloud = fresh;
                         rememberCloudBase(chartFingerprint(fresh.data), fresh.updated_at);
@@ -1210,6 +1330,13 @@
                 return;
             }
 
+            // Keluar di tengah muatan yang dimulai saat sudah masuk: jangan lanjutkan.
+            // Masuk di tengah muatan tamu tetap dilanjutkan supaya salinan tamu diganti bagan cloud.
+            if (epoch !== authEpoch && startedSignedIn) {
+                reconciling = false;
+                return;
+            }
+
             const edited = chartFingerprint(orgData) !== fpAtStart || editedDuringBoot;
             editedDuringBoot = false;
             const cacheFp = cacheAtStart.present ? chartFingerprint(cacheAtStart.data) : '';
@@ -1217,11 +1344,15 @@
 
             if (!cloudRow) {
                 if (!bootPainted) renderNodes();
-                if (authSession) {
+                if (startedSignedIn && epoch === authEpoch && canEdit()) {
                     const inserted = await insertSnapshot(JSON.parse(JSON.stringify(orgData)));
+                    if (epoch !== authEpoch || !canEdit()) {
+                        reconciling = false;
+                        return;
+                    }
                     if (inserted.ok) {
                         clearHold();
-                        rememberSynced(chartFingerprint(orgData), inserted.updated_at);
+                        rememberSynced(chartFingerprint(orgData), inserted.updated_at, orgData);
                         updateSyncStatus('synced');
                     } else {
                         cloudWriteBlocked = true;
@@ -1235,6 +1366,25 @@
                 return;
             }
 
+            // Muatan yang dimulai saat belum masuk selalu memakai bagan cloud.
+            // Masuk di tengah jalan tidak boleh mengunggah salinan tamu.
+            if (!startedSignedIn) {
+                applyDecision(cloudRow, {
+                    devicePresent: cacheAtStart.present,
+                    edited: false,
+                    mirrored,
+                    mirroredFp: metaAtStart ? metaAtStart.cloudFp : null,
+                    forceSignedOut: true
+                });
+                reconciling = false;
+                return;
+            }
+
+            if (epoch !== authEpoch) {
+                reconciling = false;
+                return;
+            }
+
             const decision = applyDecision(cloudRow, {
                 devicePresent: cacheAtStart.present,
                 edited,
@@ -1242,6 +1392,7 @@
                 mirroredFp: metaAtStart ? metaAtStart.cloudFp : null
             });
             reconciling = false;
+            if (epoch !== authEpoch) return;
             if (decision && decision.action === 'upload-device') {
                 const result = await flushCloudSave();
                 if (result && result.ok && !result.already && decision.reason === 'migrate-seed') {
@@ -1268,13 +1419,23 @@
             const remote = { data, updated_at: row.updated_at };
             if (fp === chartFingerprint(orgData)) {
                 clearHold();
-                rememberSynced(fp, remote.updated_at);
+                rememberSynced(fp, remote.updated_at, data);
                 updateSyncStatus('synced');
+                return;
+            }
+            // Pengunjung yang belum masuk tidak menyimpan versi sendiri. Pembaruan cloud langsung dipakai.
+            if (!canEdit()) {
+                clearHold();
+                rememberSynced(fp, remote.updated_at, data);
+                replaceOrgData(data, { resetHistory: true });
+                updateSyncStatus('synced');
+                showToast('Bagan diperbarui dari perangkat lain.');
                 return;
             }
             // Gema dari simpanan perangkat ini, atau versi cloud yang sudah jadi patokan.
             if (fp === lastPushedFingerprint || fp === cloudFingerprint) {
                 cloudUpdatedAt = remote.updated_at || cloudUpdatedAt;
+                noteOfficialChart(data, remote.updated_at);
                 return;
             }
             if (choiceOpen) {
@@ -1296,7 +1457,7 @@
                 return;
             }
             clearHold();
-            rememberSynced(fp, remote.updated_at);
+            rememberSynced(fp, remote.updated_at, data);
             replaceOrgData(data, { resetHistory: true });
             updateSyncStatus('synced');
             showToast('Bagan diperbarui dari perangkat lain.');
@@ -1360,15 +1521,58 @@
 
         async function signOut() {
             if (!cloudClient) return;
+            clearTimeout(cloudSaveTimer);
+            cloudSaveTimer = null;
+            cloudSaveQueued = false;
             const { error } = await cloudClient.auth.signOut();
             if (error) {
                 showToast('Gagal keluar. Coba lagi.');
+                if (canEdit()) scheduleCloudSave();
                 return;
             }
-            authSession = null;
-            updateAuthUi();
-            updateSyncStatus();
-            showToast('Anda sudah keluar. Perubahan baru tidak akan masuk ke cloud.');
+        }
+
+        // Setelah keluar, buang perubahan yang belum terkirim dan tampilkan bagan cloud.
+        async function presentOfficialChart(epoch) {
+            clearTimeout(cloudSaveTimer);
+            cloudSaveTimer = null;
+            cloudSaveQueued = false;
+            pendingRemote = null;
+            editedDuringBoot = false;
+            hideSyncBanner();
+            closeChoiceModal();
+            clearHold();
+            if (isConnectingMode) toggleConnectMode();
+            closeModal();
+            closeConfirmModal();
+            clearMultiSelection();
+            historyStack = [];
+            redoStack = [];
+
+            if (officialChart) {
+                cloudFingerprint = chartFingerprint(officialChart);
+                replaceOrgData(officialChart, { resetHistory: true, fit: 'force' });
+            }
+
+            let cloud = null;
+            try {
+                cloud = await fetchCloudRow();
+            } catch (error) {
+                console.error(error);
+            }
+            if (epoch !== authEpoch || canEdit()) return;
+            if (cloud) {
+                clearHold();
+                rememberSynced(chartFingerprint(cloud.data), cloud.updated_at, cloud.data);
+                replaceOrgData(cloud.data, { resetHistory: true, fit: 'force' });
+                updateSyncStatus('synced');
+                showToast('Anda sudah keluar. Menampilkan bagan resmi.');
+                return;
+            }
+            updateSyncStatus(officialChart ? (navigator.onLine ? 'error' : 'offline') : (navigator.onLine ? 'error' : 'offline'));
+            showToast(officialChart
+                ? 'Anda sudah keluar. Menampilkan salinan resmi terakhir.'
+                : 'Anda sudah keluar. Bagan cloud belum bisa dimuat.');
         }
 
         function bindSyncUi() {
@@ -1446,11 +1650,14 @@
                 updateAuthUi();
                 if (!bootFinished || event === 'INITIAL_SESSION') return;
                 if (event === 'SIGNED_IN') {
+                    authEpoch += 1;
                     cloudWriteBlocked = false;
                     queueReconcile();
                 } else if (event === 'SIGNED_OUT') {
+                    authEpoch += 1;
                     cloudWriteBlocked = false;
-                    updateSyncStatus();
+                    const epoch = authEpoch;
+                    presentOfficialChart(epoch);
                 } else if (event === 'TOKEN_REFRESHED') {
                     scheduleCloudSave();
                 }
@@ -1478,6 +1685,11 @@
         }
 
         // Viewport Transform State (Zoom & Pan)
+        const NODE_WIDTH = 210;
+        const NODE_HEIGHT = 64;
+        const MIN_ZOOM = 0.02;
+        const MAX_ZOOM = 2.5;
+        const FIT_PADDING = 40;
         let zoomScale = 0.5;
         let panX = 40;
         let panY = 20;
@@ -1490,6 +1702,115 @@
             transformer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
             const zoomText = document.getElementById('zoomLevelText');
             if (zoomText) zoomText.innerText = `${Math.round(zoomScale * 100)}%`;
+        }
+
+        function markViewAdjusted() {
+            userAdjustedView = true;
+        }
+
+        // Batas isi bagan: setiap kartu, plus jalur level yang memuat kartu itu (termasuk label di kiri).
+        // Sisa kanvas kosong di kanan node terakhir tidak ikut, supaya "Semua" menampilkan strukturnya.
+        function getChartContentBounds(data, lanes) {
+            const nodes = Array.isArray(data) ? data : [];
+            const zones = Array.isArray(lanes) ? lanes : [];
+            if (!nodes.length) {
+                const minY = zones.length ? Math.min(...zones.map(zone => Number(zone.top) || 0)) : 0;
+                const maxY = zones.length ? Math.max(...zones.map(zone => (Number(zone.top) || 0) + (Number(zone.height) || 0))) : 400;
+                return { minX: 0, minY, maxX: NODE_WIDTH, maxY, width: NODE_WIDTH, height: Math.max(1, maxY - minY) };
+            }
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            let laneIncluded = false;
+            nodes.forEach(node => {
+                const x = Number(node.x) || 0;
+                const y = Number(node.y) || 0;
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x + NODE_WIDTH);
+                maxY = Math.max(maxY, y + NODE_HEIGHT);
+            });
+            zones.forEach(zone => {
+                const zoneTop = Number(zone.top) || 0;
+                const zoneBottom = zoneTop + (Number(zone.height) || 0);
+                const overlaps = nodes.some(node => {
+                    const y = Number(node.y) || 0;
+                    return (y + NODE_HEIGHT) > zoneTop && y < zoneBottom;
+                });
+                if (!overlaps) return;
+                laneIncluded = true;
+                minY = Math.min(minY, zoneTop);
+                maxY = Math.max(maxY, zoneBottom);
+            });
+            if (laneIncluded) minX = Math.min(minX, 0);
+            return {
+                minX,
+                minY,
+                maxX,
+                maxY,
+                width: Math.max(1, maxX - minX),
+                height: Math.max(1, maxY - minY)
+            };
+        }
+
+        function computeFitTransform(bounds, viewWidth, viewHeight, padding) {
+            const pad = Number.isFinite(padding) ? padding : FIT_PADDING;
+            const availW = Math.max(1, viewWidth - pad * 2);
+            const availH = Math.max(1, viewHeight - pad * 2);
+            let zoom = Math.min(availW / bounds.width, availH / bounds.height);
+            if (!Number.isFinite(zoom) || zoom <= 0) zoom = 1;
+            zoom = Math.min(zoom, 1);
+            const contentW = bounds.width * zoom;
+            const contentH = bounds.height * zoom;
+            return {
+                zoom,
+                panX: (viewWidth - contentW) / 2 - bounds.minX * zoom,
+                panY: (viewHeight - contentH) / 2 - bounds.minY * zoom
+            };
+        }
+
+        function fitChartToViewport() {
+            if (!viewport) return false;
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+            if (viewW < 40 || viewH < 40) return false;
+            const bounds = getChartContentBounds(orgData, LEVEL_ZONES);
+            const fit = computeFitTransform(bounds, viewW, viewH, FIT_PADDING);
+            zoomScale = fit.zoom;
+            panX = fit.panX;
+            panY = fit.panY;
+            updateTransform();
+            return true;
+        }
+
+        function requestFitRetry(force) {
+            let tries = 0;
+            const attempt = () => {
+                if (!force && userAdjustedView) return;
+                if (fitChartToViewport() || tries++ > 5) return;
+                requestAnimationFrame(attempt);
+            };
+            requestAnimationFrame(attempt);
+        }
+
+        function autoFitChart(reason) {
+            if (reason === 'button' || reason === 'force') {
+                if (reason === 'force') {
+                    userAdjustedView = false;
+                    sawOfficialChart = true;
+                }
+                if (!fitChartToViewport()) requestFitRetry(true);
+                if (reason === 'button') markViewAdjusted();
+                return;
+            }
+            if (reason === 'official') {
+                const shouldFit = !sawOfficialChart || !userAdjustedView;
+                sawOfficialChart = true;
+                if (shouldFit && !fitChartToViewport()) requestFitRetry(false);
+                return;
+            }
+            if (!userAdjustedView && !fitChartToViewport()) requestFitRetry(false);
         }
 
         // Render Swimlanes
@@ -1544,6 +1865,7 @@
 
         // Delete single node function from modal
         function deleteSingleNode(id) {
+            if (!canEdit()) return;
             if (!id) return;
             const nodeToDelete = orgData.find(d => d.id === id);
             if (!nodeToDelete) return;
@@ -1614,10 +1936,12 @@
         // Render All Nodes on Canvas
         function renderNodes() {
             if (!container) return;
+            const firstPaint = !bootPainted;
             bootPainted = true;
             const loading = document.getElementById('chartLoading');
             if (loading) loading.remove();
             container.innerHTML = '';
+            const editing = canEdit();
 
             orgData.forEach(item => {
                 const classType = getNodeClassType(item);
@@ -1629,24 +1953,29 @@
                 node.setAttribute('data-name', String(item.name || '').toLowerCase());
                 node.setAttribute('data-title', String(item.title || '').toLowerCase());
 
-                node.innerHTML = `
+                const safeId = String(item.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const actions = editing ? `
                     <div class="node-actions">
-                        <button onclick="openEditModal('${item.id}')" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
+                        <button type="button" onclick="openEditModal('${safeId}')" title="Edit Data" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded-full shadow border border-slate-200">
                             <svg class="w-3 h-3 ic" aria-hidden="true"><use href="#i-pencil"/></svg>
                         </button>
                     </div>
+                ` : '';
+
+                node.innerHTML = `
+                    ${actions}
                     <div class="font-bold text-xs truncate max-w-full px-1">${item.name || ''}</div>
                     <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${item.title || ''}</div>
                 `;
 
                 node.addEventListener('click', (e) => {
+                    if (!canEdit() || !isConnectingMode) return;
                     e.stopPropagation();
-                    if (isConnectingMode) {
-                        handleConnectClick(item.id);
-                    }
+                    handleConnectClick(item.id);
                 });
 
                 node.addEventListener('dblclick', (e) => {
+                    if (!canEdit()) return;
                     e.stopPropagation();
                     openEditModal(item.id);
                 });
@@ -1656,6 +1985,7 @@
             });
 
             updateConnectors();
+            if (firstPaint) autoFitChart('first');
         }
 
         // Generate Clean Unified Tree Bus Connectors
@@ -1747,6 +2077,7 @@
             const DRAG_THRESHOLD = 4; // px layar
 
             element.addEventListener('mousedown', (e) => {
+                if (!canEdit()) return;
                 if (e.button !== 0) return;
                 if (isConnectingMode || e.target.closest('.node-actions')) return;
                 e.stopPropagation();
@@ -1781,6 +2112,7 @@
                 }
 
                 function onMouseMove(ev) {
+                    if (!canEdit()) return;
                     if (!isDragging) {
                         if (Math.abs(ev.clientX - startX) < DRAG_THRESHOLD && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
                         beginDrag();
@@ -1814,6 +2146,11 @@
                     // Klik biasa (tanpa geser): jangan sentuh DOM sama sekali, biar dblclick bisa jalan.
                     if (!isDragging) return;
                     isDragging = false;
+                    if (!canEdit()) {
+                        chartInteraction = Math.max(0, chartInteraction - 1);
+                        drainPendingRemote();
+                        return;
+                    }
 
                     selectedNodeIds.forEach(selectedId => {
                         const nodeData = orgData.find(d => d.id === selectedId);
@@ -1848,6 +2185,7 @@
         let connectChildId = null;
 
         function toggleConnectMode() {
+            if (!isConnectingMode && !canEdit()) return;
             isConnectingMode = !isConnectingMode;
             connectChildId = null;
 
@@ -1867,6 +2205,7 @@
         }
 
         function handleConnectClick(nodeId) {
+            if (!canEdit()) return;
             if (!connectChildId) {
                 connectChildId = nodeId;
                 const nodeEl = document.getElementById(`node-${nodeId}`);
@@ -1973,6 +2312,7 @@
         }
 
         function openEditModal(nodeId = null) {
+            if (!canEdit()) return;
             const modal = document.getElementById('nodeModal');
             const parentSelect = document.getElementById('modalParentSelect');
             const vacantCheckbox = document.getElementById('modalIsVacant');
@@ -2060,6 +2400,7 @@
 
         // Simpan dari modal. Dipanggil oleh tombol Simpan dan tombol Enter.
         function saveNodeFromModal() {
+            if (!canEdit()) return false;
             const titleSelectEl = document.getElementById('modalTitleSelect');
             const customTitleInputEl = document.getElementById('modalCustomTitleInput');
             const nameInputEl = document.getElementById('modalName');
@@ -2319,25 +2660,20 @@
             // Zoom & Control Buttons
             const zoomInBtn = document.getElementById('zoomInBtn');
             if (zoomInBtn) zoomInBtn.addEventListener('click', () => {
-                zoomScale = Math.min(2.5, zoomScale * 1.15);
+                zoomScale = Math.min(MAX_ZOOM, zoomScale * 1.15);
+                markViewAdjusted();
                 updateTransform();
             });
 
             const zoomOutBtn = document.getElementById('zoomOutBtn');
             if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => {
-                zoomScale = Math.max(0.2, zoomScale / 1.15);
+                zoomScale = Math.max(MIN_ZOOM, zoomScale / 1.15);
+                markViewAdjusted();
                 updateTransform();
             });
 
             const resetViewBtn = document.getElementById('resetViewBtn');
-            if (resetViewBtn) {
-                resetViewBtn.addEventListener('click', () => {
-                    zoomScale = 0.5;
-                    panX = 40;
-                    panY = 20;
-                    updateTransform();
-                });
-            }
+            if (resetViewBtn) resetViewBtn.addEventListener('click', () => autoFitChart('button'));
 
             const undoBtn = document.getElementById('undoBtn');
             if (undoBtn) undoBtn.addEventListener('click', undo);
@@ -2361,6 +2697,8 @@
                 const isUndoShortcut = primaryModifier && key === 'z' && !e.shiftKey;
                 const isRedoShortcut = primaryModifier && key === 'z' && e.shiftKey;
                 const isWindowsRedoShortcut = !isMac && e.ctrlKey && key === 'y';
+
+                if (!canEdit()) return;
 
                 if (isUndoShortcut) {
                     e.preventDefault();
@@ -2438,14 +2776,17 @@
             // Canvas Panning & Drag Selection
             let isPanning = false;
             let panStartX = 0, panStartY = 0;
+            let panDidMove = false;
             let isBoxSelecting = false;
             let boxStartX = 0, boxStartY = 0;
             const selectionBox = document.getElementById('selectionBox');
 
             viewport.addEventListener('mousedown', (e) => {
-                if (e.target.closest('.org-node') || e.target.closest('button') || e.target.closest('input')) return;
+                if (e.target.closest('button') || e.target.closest('input')) return;
+                const onNode = !!e.target.closest('.org-node');
+                if (onNode && canEdit()) return;
 
-                if (e.shiftKey) {
+                if (e.shiftKey && canEdit()) {
                     isBoxSelecting = true;
                     const chartRect = document.getElementById('chartArea').getBoundingClientRect();
                     boxStartX = (e.clientX - chartRect.left) / zoomScale;
@@ -2461,6 +2802,7 @@
                 } else {
                     clearMultiSelection();
                     isPanning = true;
+                    panDidMove = false;
                     viewport.classList.add('grabbing');
                     panStartX = e.clientX - panX;
                     panStartY = e.clientY - panY;
@@ -2469,8 +2811,14 @@
 
             window.addEventListener('mousemove', (e) => {
                 if (isPanning) {
-                    panX = e.clientX - panStartX;
-                    panY = e.clientY - panStartY;
+                    const nextX = e.clientX - panStartX;
+                    const nextY = e.clientY - panStartY;
+                    if (!panDidMove && (Math.abs(nextX - panX) >= 3 || Math.abs(nextY - panY) >= 3)) {
+                        panDidMove = true;
+                        markViewAdjusted();
+                    }
+                    panX = nextX;
+                    panY = nextY;
                     updateTransform();
                 } else if (isBoxSelecting && selectionBox) {
                     const chartRect = document.getElementById('chartArea').getBoundingClientRect();
@@ -2520,9 +2868,9 @@
                 
                 const oldScale = zoomScale;
                 if (delta > 0) {
-                    zoomScale = Math.min(2.5, zoomScale * 1.08);
+                    zoomScale = Math.min(MAX_ZOOM, zoomScale * 1.08);
                 } else {
-                    zoomScale = Math.max(0.2, zoomScale / 1.08);
+                    zoomScale = Math.max(MIN_ZOOM, zoomScale / 1.08);
                 }
 
                 const rect = viewport.getBoundingClientRect();
@@ -2531,13 +2879,22 @@
 
                 panX = mouseX - (mouseX - panX) * (zoomScale / oldScale);
                 panY = mouseY - (mouseY - panY) * (zoomScale / oldScale);
+                markViewAdjusted();
 
                 updateTransform();
             }, { passive: false });
 
-            let hadLocalCache = false;
-            try { hadLocalCache = !!localStorage.getItem(STORAGE_KEY); } catch (e) { /* abaikan */ }
-            if (hadLocalCache || !navigator.onLine) renderNodes();
+            window.addEventListener('resize', () => {
+                if (!userAdjustedView) fitChartToViewport();
+            });
+
+            // Online: tunggu bagan cloud supaya salinan perangkat yang berbeda tidak sempat tampil.
+            // Offline: cache baca boleh langsung digambar, asal tidak diubah.
+            if (!navigator.onLine) {
+                hydrateOfficialMetaFromCache();
+                renderNodes();
+                updateLastUpdatedLabel();
+            }
             updateTransform();
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js').catch(() => { /* halaman tetap jalan tanpa cache offline */ });
