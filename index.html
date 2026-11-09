@@ -19,7 +19,9 @@
         /* Viewport Container */
         #viewport {
             width: 100vw;
-            height: calc(100vh - 61px);
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto;
             position: relative;
             overflow: hidden;
             cursor: grab;
@@ -266,6 +268,7 @@
         <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
         <symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
         <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+        <symbol id="i-log-in" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></symbol>
     </defs></svg>
 
     <!-- HEADER / TOOLBAR -->
@@ -279,6 +282,10 @@
                     <h1 class="font-bold text-lg text-slate-900 tracking-tight leading-none">STK Organization Chart</h1>
                 </div>
                 <p class="text-xs text-slate-500 font-medium mt-0.5">Bagan Struktur Organisasi - Auto-Snap Levels & High-Res Export</p>
+                <div id="syncStatus" class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 leading-tight mt-1" title="Status sinkronisasi bagan">
+                    <span id="syncDot" class="w-1.5 h-1.5 rounded-full shrink-0 bg-sky-400"></span>
+                    <span id="syncStatusText">Memuat bagan cloud...</span>
+                </div>
             </div>
         </div>
 
@@ -289,7 +296,14 @@
             <button id="cancelConnectBtn" class="text-amber-900 underline hover:text-black ml-2 text-[11px]">Batal</button>
         </div>
 
-        <div class="flex items-center flex-wrap gap-3">
+        <div class="flex items-center flex-wrap gap-3 max-w-full">
+            <div class="flex items-center gap-2">
+                <button type="button" id="authBtn" title="Masuk untuk menyimpan perubahan ke cloud" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition shadow-sm">
+                    <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-log-in"/></svg>
+                    <span id="authBtnLabel" class="max-w-[14rem] truncate">Masuk</span>
+                </button>
+            </div>
+
             <!-- Search -->
             <div class="relative w-44">
                 <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 ic" aria-hidden="true"><use href="#i-search"/></svg>
@@ -311,7 +325,7 @@
             </div>
 
             <!-- Toolbar Controls -->
-            <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
+            <div class="flex items-center flex-wrap bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1 max-w-full">
                 <button id="undoBtn" title="Undo Langkah (Cmd+Z / Ctrl+Z)" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-slate-600 ic" aria-hidden="true"><use href="#i-undo-2"/></svg> Undo
                 </button>
@@ -331,8 +345,17 @@
         </div>
     </header>
 
+    <div id="syncBanner" class="hidden bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+        <p id="syncBannerText" class="font-medium"></p>
+        <div class="flex gap-2">
+            <button type="button" id="syncUseCloudBtn" class="px-2.5 py-1 bg-white border border-amber-300 rounded-md font-semibold hover:bg-amber-100">Pakai cloud</button>
+            <button type="button" id="syncUseDeviceBtn" class="px-2.5 py-1 bg-amber-600 text-white rounded-md font-semibold hover:bg-amber-700">Pakai perangkat ini</button>
+        </div>
+    </div>
+
     <!-- MAIN VIEWPORT CANVAS WITH TRANSFORMER -->
     <main id="viewport" class="">
+        <div id="chartLoading" class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-500 z-20">Memuat bagan...</div>
         <div id="chartTransformer">
             <div id="chartArea">
                 <!-- Swimlanes Background -->
@@ -422,6 +445,60 @@
 
     <div id="toast" role="status" aria-live="polite"></div>
 
+    <!-- LOGIN -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[120] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-sm">Masuk untuk menyimpan bagan</h3>
+                <button type="button" id="closeLoginBtn" class="text-slate-400 hover:text-slate-600" aria-label="Tutup"><svg class="w-5 h-5 ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+            </div>
+            <form id="loginForm" class="p-6 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">Bagan terbaru tetap bisa dilihat tanpa masuk. Perubahan masuk ke cloud hanya untuk akun STK yang aktif, supaya bagan yang sama muncul di setiap perangkat.</p>
+                <div>
+                    <label for="loginEmail" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Email</label>
+                    <input type="email" id="loginEmail" autocomplete="username" required placeholder="nama@perusahaan.com" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="loginPassword" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Kata sandi</label>
+                    <input type="password" id="loginPassword" autocomplete="current-password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <p id="loginError" class="text-xs font-semibold text-red-600 min-h-[1rem]" role="alert"></p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" id="cancelLoginBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">Batal</button>
+                    <button type="submit" id="loginSubmitBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow disabled:opacity-60">Masuk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PILIH VERSI BAGAN -->
+    <div id="choiceModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[130] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                <h3 class="font-bold text-slate-800 text-sm">Pilih versi bagan</h3>
+            </div>
+            <div class="p-6 space-y-4">
+                <p id="choiceNote" class="text-xs text-slate-600 leading-relaxed"></p>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div class="font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Perangkat ini</div>
+                        <div class="mt-1 font-bold text-slate-900"><span id="choiceDeviceCount">0</span> posisi</div>
+                    </div>
+                    <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                        <div class="font-semibold text-indigo-600 uppercase tracking-wide text-[10px]">Cloud</div>
+                        <div class="mt-1 font-bold text-slate-900"><span id="choiceCloudCount">0</span> posisi</div>
+                        <div id="choiceCloudWhen" class="mt-1 text-[11px] text-slate-500"></div>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-end gap-2">
+                    <button type="button" id="choiceUseCloudBtn" class="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">Pakai cloud</button>
+                    <button type="button" id="choiceUseDeviceBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow">Pakai perangkat ini</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.86.2/dist/umd/supabase.js"></script>
     <script>
         // LocalStorage Key (Version 13, naik karena layout default berubah)
         const STORAGE_KEY = 'STK_ORG_CHART_DATA_V13';
@@ -535,12 +612,869 @@
             }
         }
 
-        function autoSaveToLocalStorage() {
+        function autoSaveToLocalStorage(options) {
+            const skipCloud = !!(options && options.skipCloud);
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(orgData));
             } catch (e) {
                 console.error("Gagal menyimpan ke local storage", e);
             }
+            if (skipCloud) return;
+            if (!cloudReady || reconciling) {
+                editedDuringBoot = true;
+                return;
+            }
+            scheduleCloudSave();
+        }
+
+        // Sinkronisasi cloud. Kunci publishable aman di halaman publik; menulis tetap dibatasi RLS.
+        const SUPABASE_URL = 'https://zofdhgzdyebvdanrmknt.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_EYe-5PaValQvkC5eIZ3WbA_UGgbIYDr';
+        const CHART_ID = 'stk';
+        const HOLD_KEY = 'STK_ORG_CHART_HOLD_DEVICE_V1';
+        const META_KEY = 'STK_ORG_CHART_CLOUD_META_V1';
+        const CLOUD_SAVE_DELAY = 800;
+
+        const cloudClient = (window.supabase && typeof window.supabase.createClient === 'function')
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true
+                }
+            })
+            : null;
+
+        let authSession = null;
+        let cloudFingerprint = null;
+        let cloudUpdatedAt = null;
+        let cloudReady = false;
+        let bootFinished = false;
+        let bootPainted = false;
+        let reconciling = false;
+        let editedDuringBoot = false;
+        let cloudBootStarted = false;
+        let cloudSaveTimer = null;
+        let cloudSaveInFlight = false;
+        let cloudSaveQueued = false;
+        let lastPushedFingerprint = null;
+        let cloudWriteBlocked = false;
+        let lastSyncError = '';
+        let choiceOpen = false;
+        let pendingChoiceCloud = null;
+        let pendingRemote = null;
+        let chartInteraction = 0;
+        let realtimeChannel = null;
+        let reconcileChain = Promise.resolve();
+        let defaultChartFingerprint = null;
+
+        function chartFingerprint(data) {
+            if (!Array.isArray(data)) return '';
+            return data.map(node => {
+                const parent = node.parent == null || node.parent === '' ? '' : String(node.parent);
+                const x = Math.round((Number(node.x) || 0) * 100) / 100;
+                const y = Math.round((Number(node.y) || 0) * 100) / 100;
+                return [
+                    node.id == null ? '' : String(node.id),
+                    node.name == null ? '' : String(node.name),
+                    node.title == null ? '' : String(node.title),
+                    parent,
+                    node.type == null ? '' : String(node.type),
+                    x,
+                    y
+                ].join('\u001f');
+            }).sort().join('\u001e');
+        }
+
+        function getDefaultFingerprint() {
+            if (!defaultChartFingerprint) defaultChartFingerprint = chartFingerprint(defaultOrgData);
+            return defaultChartFingerprint;
+        }
+
+        function coerceChart(data) {
+            let rows = data;
+            if (typeof rows === 'string') {
+                try { rows = JSON.parse(rows); } catch (e) { return null; }
+            }
+            if (!Array.isArray(rows)) return null;
+            return rows.filter(node => node && node.id != null).map(node => ({
+                ...node,
+                id: String(node.id),
+                name: node.name == null ? '' : String(node.name),
+                title: node.title == null ? '' : String(node.title),
+                parent: node.parent ? node.parent : null,
+                type: node.type || 'staff',
+                x: Number(node.x) || 0,
+                y: Number(node.y) || 0
+            }));
+        }
+
+        function decideInitialSync({
+            devicePresent,
+            deviceFp,
+            cloudFp,
+            defaultFp,
+            signedIn,
+            editedDuringBoot: edited,
+            hold,
+            mirrored,
+            mirroredFp
+        }) {
+            if (!cloudFp) return { action: 'keep-device', status: 'offline' };
+            if (deviceFp === cloudFp) return { action: 'use-cloud' };
+            if (mirrored && !edited) return { action: 'use-cloud' };
+            if (mirrored && edited && mirroredFp && cloudFp === mirroredFp) {
+                return signedIn
+                    ? { action: 'upload-device', reason: 'local-edit' }
+                    : { action: 'keep-device', status: 'signin-to-sync' };
+            }
+
+            const held = !!(hold && hold.cloudFp === cloudFp);
+            if (held) {
+                return signedIn
+                    ? { action: 'upload-device', reason: 'held-device' }
+                    : { action: 'keep-device', status: 'signin-to-sync' };
+            }
+
+            if (!devicePresent && !edited) return { action: 'use-cloud' };
+
+            const cloudIsDefault = cloudFp === defaultFp;
+            const deviceIsDefault = deviceFp === defaultFp;
+            if (cloudIsDefault && !deviceIsDefault) {
+                return signedIn
+                    ? { action: 'upload-device', reason: 'migrate-seed' }
+                    : { action: 'keep-device', status: 'signin-to-sync' };
+            }
+            if (deviceIsDefault && !cloudIsDefault && !edited) return { action: 'use-cloud' };
+            return { action: 'ask', reason: 'diverged' };
+        }
+
+        function readDeviceCache() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return { present: false, data: null };
+                const data = JSON.parse(raw);
+                if (!Array.isArray(data)) return { present: false, data: null };
+                return { present: true, data };
+            } catch (e) {
+                return { present: false, data: null };
+            }
+        }
+
+        function readMeta() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(META_KEY) || 'null');
+                if (!parsed || typeof parsed.cloudFp !== 'string') return null;
+                return parsed;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function readHold() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(HOLD_KEY) || 'null');
+                if (!parsed || typeof parsed.cloudFp !== 'string') return null;
+                return parsed;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function clearHold() {
+            try { localStorage.removeItem(HOLD_KEY); } catch (e) { /* abaikan */ }
+        }
+
+        function rememberSynced(fp, updatedAt) {
+            cloudFingerprint = fp;
+            cloudUpdatedAt = updatedAt || cloudUpdatedAt;
+            try {
+                localStorage.setItem(META_KEY, JSON.stringify({
+                    cloudFp: fp,
+                    cloudUpdatedAt: cloudUpdatedAt
+                }));
+            } catch (e) { /* abaikan */ }
+        }
+
+        function rememberCloudBase(fp, updatedAt) {
+            cloudFingerprint = fp;
+            if (updatedAt) cloudUpdatedAt = updatedAt;
+        }
+
+        function replaceOrgData(next, options) {
+            orgData = JSON.parse(JSON.stringify(next));
+            if (options && options.resetHistory) {
+                historyStack = [];
+                redoStack = [];
+            }
+            renderNodes();
+            autoSaveToLocalStorage({ skipCloud: true });
+        }
+
+        function formatWhen(iso) {
+            if (!iso) return '';
+            const date = new Date(iso);
+            if (Number.isNaN(date.getTime())) return '';
+            try {
+                return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+            } catch (e) {
+                return date.toISOString();
+            }
+        }
+
+        function updateSyncStatus(mode) {
+            const text = document.getElementById('syncStatusText');
+            const dot = document.getElementById('syncDot');
+            if (!text || !dot) return;
+            const dirty = !!(cloudFingerprint && chartFingerprint(orgData) !== cloudFingerprint);
+            let label = 'Memuat bagan cloud...';
+            let color = '#38bdf8';
+
+            if (!navigator.onLine || mode === 'offline') {
+                label = 'Offline — salinan di perangkat ini';
+                color = '#94a3b8';
+            } else if (mode === 'loading' || (!bootFinished && mode !== 'error')) {
+                label = 'Memuat bagan cloud...';
+                color = '#38bdf8';
+            } else if (mode === 'saving' || cloudSaveInFlight) {
+                label = 'Menyimpan ke cloud...';
+                color = '#fbbf24';
+            } else if (mode === 'error' || (cloudWriteBlocked && dirty)) {
+                label = lastSyncError || 'Gagal menyimpan ke cloud';
+                color = '#ef4444';
+            } else if (!authSession && dirty) {
+                label = 'Belum masuk — perubahan hanya di perangkat ini';
+                color = '#fbbf24';
+            } else if (!authSession) {
+                label = 'Melihat bagan cloud · masuk untuk menyimpan';
+                color = '#10b981';
+            } else if (dirty) {
+                label = 'Perubahan belum terkirim';
+                color = '#fbbf24';
+            } else {
+                label = 'Tersinkron';
+                color = '#10b981';
+            }
+
+            text.textContent = label;
+            dot.style.backgroundColor = color;
+        }
+
+        function updateAuthUi() {
+            const label = document.getElementById('authBtnLabel');
+            const btn = document.getElementById('authBtn');
+            if (!label || !btn) return;
+            const email = authSession && authSession.user && authSession.user.email;
+            if (email) {
+                label.textContent = email + ' · Keluar';
+                btn.title = 'Keluar dari akun ' + email;
+            } else {
+                label.textContent = 'Masuk';
+                btn.title = 'Masuk untuk menyimpan perubahan ke cloud';
+            }
+        }
+
+        function translateAuthError(error) {
+            const msg = String((error && error.message) || '').toLowerCase();
+            if (msg.includes('invalid login') || msg.includes('invalid credentials')) return 'Email atau kata sandi salah.';
+            if (msg.includes('email not confirmed')) return 'Email belum dikonfirmasi.';
+            if (msg.includes('too many')) return 'Terlalu banyak percobaan. Coba lagi sebentar.';
+            if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed')) return 'Tidak terhubung ke server.';
+            return 'Gagal masuk. Coba lagi.';
+        }
+
+        function openLoginModal() {
+            const modal = document.getElementById('loginModal');
+            const err = document.getElementById('loginError');
+            if (err) err.textContent = '';
+            if (modal) modal.classList.remove('hidden');
+            const email = document.getElementById('loginEmail');
+            if (email) email.focus();
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById('loginModal');
+            if (modal) modal.classList.add('hidden');
+            const password = document.getElementById('loginPassword');
+            if (password) password.value = '';
+        }
+
+        function updateChoiceCopy() {
+            const note = document.getElementById('choiceNote');
+            if (!note) return;
+            note.textContent = authSession
+                ? 'Bagan di perangkat ini berbeda dari bagan cloud. Pilih salah satu. Versi yang tidak dipilih tidak akan disimpan ke cloud.'
+                : 'Bagan di perangkat ini berbeda dari bagan cloud. Pakai cloud untuk mengikuti versi bersama. Pakai perangkat ini untuk mempertahankan salinan lokal — masuk dulu agar salinan itu tersimpan ke cloud.';
+        }
+
+        function openChoiceModal(cloudRow) {
+            if (!cloudRow || !Array.isArray(cloudRow.data)) return;
+            choiceOpen = true;
+            pendingChoiceCloud = cloudRow;
+            hideSyncBanner();
+            const deviceCount = document.getElementById('choiceDeviceCount');
+            const cloudCount = document.getElementById('choiceCloudCount');
+            const when = document.getElementById('choiceCloudWhen');
+            if (deviceCount) deviceCount.textContent = String(orgData.length);
+            if (cloudCount) cloudCount.textContent = String(cloudRow.data.length);
+            if (when) when.textContent = formatWhen(cloudRow.updated_at);
+            updateChoiceCopy();
+            const modal = document.getElementById('choiceModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeChoiceModal() {
+            choiceOpen = false;
+            pendingChoiceCloud = null;
+            const modal = document.getElementById('choiceModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function showSyncBanner(message) {
+            if (choiceOpen) return;
+            const banner = document.getElementById('syncBanner');
+            const text = document.getElementById('syncBannerText');
+            if (!banner || !text) return;
+            text.textContent = message;
+            banner.classList.remove('hidden');
+        }
+
+        function hideSyncBanner() {
+            const banner = document.getElementById('syncBanner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        function chooseCloudVersion(cloud) {
+            if (!cloud || !Array.isArray(cloud.data)) return;
+            clearHold();
+            hideSyncBanner();
+            closeChoiceModal();
+            rememberSynced(chartFingerprint(cloud.data), cloud.updated_at);
+            replaceOrgData(cloud.data, { resetHistory: true });
+            updateSyncStatus('synced');
+            showToast('Menampilkan bagan cloud.');
+        }
+
+        async function chooseDeviceVersion(cloud) {
+            if (cloud && cloud.updated_at) cloudUpdatedAt = cloud.updated_at;
+            closeChoiceModal();
+            hideSyncBanner();
+            if (authSession) {
+                clearHold();
+                const result = await flushCloudSave();
+                if (result && result.ok) showToast('Bagan perangkat ini disimpan ke cloud.');
+                return;
+            }
+            if (cloud && Array.isArray(cloud.data)) {
+                try {
+                    localStorage.setItem(HOLD_KEY, JSON.stringify({ cloudFp: chartFingerprint(cloud.data) }));
+                } catch (e) { /* abaikan */ }
+            }
+            updateSyncStatus();
+            showToast('Versi perangkat ini dipertahankan. Masuk untuk menyimpannya ke cloud.');
+        }
+
+        async function fetchCloudRow() {
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
+            let query = cloudClient
+                .from('org_chart_state')
+                .select('id, data, updated_at')
+                .eq('id', CHART_ID);
+            if (controller) query = query.abortSignal(controller.signal);
+            let data, error;
+            try {
+                const result = await query.maybeSingle();
+                data = result.data;
+                error = result.error;
+            } finally {
+                if (timer) clearTimeout(timer);
+            }
+            if (error) throw error;
+            if (!data) return null;
+            const chart = coerceChart(data.data);
+            if (!chart) throw new Error('Data bagan cloud tidak valid');
+            return { id: data.id, data: chart, updated_at: data.updated_at };
+        }
+
+        async function writeSnapshot(snapshot, allowRetry) {
+            let query = cloudClient
+                .from('org_chart_state')
+                .update({
+                    data: snapshot,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', CHART_ID);
+            if (cloudUpdatedAt) query = query.eq('updated_at', cloudUpdatedAt);
+            const { data, error } = await query.select('updated_at').maybeSingle();
+            if (error) {
+                const msg = String(error.message || '').toLowerCase();
+                const code = String(error.code || '');
+                if (error.status === 401 || code === '42501' || code === 'PGRST301' || msg.includes('jwt') || msg.includes('permission') || msg.includes('row-level')) {
+                    return { ok: false, reason: 'forbidden', error };
+                }
+                throw error;
+            }
+            if (data && data.updated_at) return { ok: true, updated_at: data.updated_at };
+
+            const fresh = await fetchCloudRow();
+            if (!fresh) return { ok: false, reason: 'forbidden' };
+            const freshFp = chartFingerprint(fresh.data);
+            const snapshotFp = chartFingerprint(snapshot);
+            if (freshFp === snapshotFp) return { ok: true, updated_at: fresh.updated_at, already: true };
+            if (cloudFingerprint && freshFp === cloudFingerprint) {
+                if (allowRetry !== false && fresh.updated_at && fresh.updated_at !== cloudUpdatedAt) {
+                    cloudUpdatedAt = fresh.updated_at;
+                    return writeSnapshot(snapshot, false);
+                }
+                return { ok: false, reason: 'forbidden' };
+            }
+            return { ok: false, reason: 'conflict', cloud: fresh };
+        }
+
+        function scheduleCloudSave() {
+            if (!cloudClient || !cloudReady || reconciling || choiceOpen || cloudWriteBlocked || !authSession) {
+                updateSyncStatus();
+                return;
+            }
+            clearTimeout(cloudSaveTimer);
+            cloudSaveTimer = setTimeout(() => {
+                flushCloudSave().catch(err => {
+                    console.error(err);
+                    lastSyncError = 'Gagal menyimpan ke cloud. Perubahan tetap ada di perangkat ini.';
+                    updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                });
+            }, CLOUD_SAVE_DELAY);
+            updateSyncStatus();
+        }
+
+        async function flushCloudSave() {
+            if (!cloudClient || choiceOpen || cloudWriteBlocked) return { ok: false, reason: 'paused' };
+            if (!authSession) {
+                updateSyncStatus();
+                return { ok: false, reason: 'signed-out' };
+            }
+            if (cloudSaveInFlight) {
+                cloudSaveQueued = true;
+                return { ok: false, reason: 'queued' };
+            }
+            const snapshot = JSON.parse(JSON.stringify(orgData));
+            const snapshotFp = chartFingerprint(snapshot);
+            if (snapshotFp === cloudFingerprint) {
+                rememberSynced(snapshotFp, cloudUpdatedAt);
+                updateSyncStatus('synced');
+                return { ok: true, already: true };
+            }
+
+            cloudSaveInFlight = true;
+            lastPushedFingerprint = snapshotFp;
+            updateSyncStatus('saving');
+            try {
+                const result = await writeSnapshot(snapshot);
+                if (!result.ok && result.reason === 'conflict' && result.cloud) {
+                    rememberCloudBase(chartFingerprint(result.cloud.data), result.cloud.updated_at);
+                    openChoiceModal(result.cloud);
+                    updateSyncStatus();
+                    return result;
+                }
+                if (!result.ok && result.reason === 'forbidden') {
+                    cloudWriteBlocked = true;
+                    lastSyncError = 'Akun ini tidak berhak menyimpan bagan. Pastikan akun STK Anda aktif.';
+                    updateSyncStatus('error');
+                    showToast(lastSyncError);
+                    return result;
+                }
+                if (!result.ok) {
+                    lastSyncError = 'Gagal menyimpan ke cloud. Perubahan tetap ada di perangkat ini.';
+                    updateSyncStatus('error');
+                    return result;
+                }
+                cloudUpdatedAt = result.updated_at || cloudUpdatedAt;
+                cloudFingerprint = snapshotFp;
+                if (chartFingerprint(orgData) === snapshotFp) {
+                    clearHold();
+                    rememberSynced(snapshotFp, cloudUpdatedAt);
+                    updateSyncStatus('synced');
+                } else {
+                    cloudSaveQueued = true;
+                    updateSyncStatus();
+                }
+                return { ok: true, updated_at: result.updated_at };
+            } catch (error) {
+                console.error(error);
+                lastSyncError = 'Gagal menyimpan ke cloud. Perubahan tetap ada di perangkat ini.';
+                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                return { ok: false, reason: 'network', error };
+            } finally {
+                cloudSaveInFlight = false;
+                if (cloudSaveQueued && !choiceOpen && !cloudWriteBlocked) {
+                    cloudSaveQueued = false;
+                    scheduleCloudSave();
+                } else {
+                    cloudSaveQueued = false;
+                }
+                drainPendingRemote();
+            }
+        }
+
+        async function insertSnapshot(snapshot) {
+            const { data, error } = await cloudClient
+                .from('org_chart_state')
+                .insert({
+                    id: CHART_ID,
+                    data: snapshot,
+                    updated_at: new Date().toISOString()
+                })
+                .select('updated_at')
+                .maybeSingle();
+            if (error || !data) return { ok: false, reason: 'forbidden', error };
+            return { ok: true, updated_at: data.updated_at };
+        }
+
+        function applyDecision(cloudRow, context) {
+            const deviceFp = chartFingerprint(orgData);
+            const cloudFp = chartFingerprint(cloudRow.data);
+            const decision = decideInitialSync({
+                devicePresent: context.devicePresent || context.edited,
+                deviceFp,
+                cloudFp,
+                defaultFp: getDefaultFingerprint(),
+                signedIn: !!authSession,
+                editedDuringBoot: context.edited,
+                hold: readHold(),
+                mirrored: context.mirrored,
+                mirroredFp: context.mirroredFp
+            });
+
+            if (decision.action === 'use-cloud') {
+                clearHold();
+                rememberSynced(cloudFp, cloudRow.updated_at);
+                if (deviceFp !== cloudFp || !bootPainted) {
+                    replaceOrgData(cloudRow.data, { resetHistory: deviceFp !== cloudFp });
+                }
+                updateSyncStatus('synced');
+                return decision;
+            }
+
+            rememberCloudBase(cloudFp, cloudRow.updated_at);
+            if (!bootPainted) renderNodes();
+
+            if (decision.action === 'upload-device') {
+                updateSyncStatus();
+                return decision;
+            }
+
+            if (decision.action === 'ask') {
+                updateSyncStatus();
+                openChoiceModal(cloudRow);
+                return decision;
+            }
+
+            updateSyncStatus(decision.status === 'offline' ? 'offline' : undefined);
+            return decision;
+        }
+
+        async function pullAndReconcile() {
+            if (!cloudClient) return;
+            if (choiceOpen && pendingChoiceCloud) {
+                try {
+                    const fresh = await fetchCloudRow();
+                    if (fresh) {
+                        pendingChoiceCloud = fresh;
+                        rememberCloudBase(chartFingerprint(fresh.data), fresh.updated_at);
+                        const cloudCount = document.getElementById('choiceCloudCount');
+                        const when = document.getElementById('choiceCloudWhen');
+                        if (cloudCount) cloudCount.textContent = String(fresh.data.length);
+                        if (when) when.textContent = formatWhen(fresh.updated_at);
+                        updateChoiceCopy();
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+                return;
+            }
+
+            reconciling = true;
+            const fpAtStart = chartFingerprint(orgData);
+            const cacheAtStart = readDeviceCache();
+            const metaAtStart = readMeta();
+            let cloudRow = null;
+            try {
+                cloudRow = await fetchCloudRow();
+            } catch (error) {
+                console.error(error);
+                lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
+                if (!bootPainted) renderNodes();
+                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                reconciling = false;
+                return;
+            }
+
+            const edited = chartFingerprint(orgData) !== fpAtStart || editedDuringBoot;
+            editedDuringBoot = false;
+            const cacheFp = cacheAtStart.present ? chartFingerprint(cacheAtStart.data) : '';
+            const mirrored = !!(metaAtStart && cacheAtStart.present && cacheFp === metaAtStart.cloudFp);
+
+            if (!cloudRow) {
+                if (!bootPainted) renderNodes();
+                if (authSession) {
+                    const inserted = await insertSnapshot(JSON.parse(JSON.stringify(orgData)));
+                    if (inserted.ok) {
+                        clearHold();
+                        rememberSynced(chartFingerprint(orgData), inserted.updated_at);
+                        updateSyncStatus('synced');
+                    } else {
+                        cloudWriteBlocked = true;
+                        lastSyncError = 'Akun ini tidak berhak menyimpan bagan. Pastikan akun STK Anda aktif.';
+                        updateSyncStatus('error');
+                    }
+                } else {
+                    updateSyncStatus();
+                }
+                reconciling = false;
+                return;
+            }
+
+            const decision = applyDecision(cloudRow, {
+                devicePresent: cacheAtStart.present,
+                edited,
+                mirrored,
+                mirroredFp: metaAtStart ? metaAtStart.cloudFp : null
+            });
+            reconciling = false;
+            if (decision && decision.action === 'upload-device') {
+                const result = await flushCloudSave();
+                if (result && result.ok && !result.already && decision.reason === 'migrate-seed') {
+                    showToast('Bagan di perangkat ini diunggah ke cloud.');
+                }
+            }
+        }
+
+        function queueReconcile() {
+            reconcileChain = reconcileChain.then(() => pullAndReconcile()).catch(error => {
+                console.error(error);
+                lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
+                if (!bootPainted) renderNodes();
+                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                reconciling = false;
+            });
+            return reconcileChain;
+        }
+
+        function handleRemoteRow(row) {
+            const data = coerceChart(row && row.data);
+            if (!data) return;
+            const fp = chartFingerprint(data);
+            const remote = { data, updated_at: row.updated_at };
+            if (fp === chartFingerprint(orgData)) {
+                clearHold();
+                rememberSynced(fp, remote.updated_at);
+                updateSyncStatus('synced');
+                return;
+            }
+            // Gema dari simpanan perangkat ini, atau versi cloud yang sudah jadi patokan.
+            if (fp === lastPushedFingerprint || fp === cloudFingerprint) {
+                cloudUpdatedAt = remote.updated_at || cloudUpdatedAt;
+                return;
+            }
+            if (choiceOpen) {
+                pendingChoiceCloud = remote;
+                rememberCloudBase(fp, remote.updated_at);
+                const cloudCount = document.getElementById('choiceCloudCount');
+                const when = document.getElementById('choiceCloudWhen');
+                if (cloudCount) cloudCount.textContent = String(data.length);
+                if (when) when.textContent = formatWhen(remote.updated_at);
+                return;
+            }
+            if (reconciling || chartInteraction > 0 || cloudSaveInFlight) {
+                pendingRemote = remote;
+                return;
+            }
+            if (cloudFingerprint && chartFingerprint(orgData) !== cloudFingerprint) {
+                pendingRemote = remote;
+                showSyncBanner('Ada pembaruan bagan di cloud. Anda juga punya perubahan yang belum terkirim.');
+                return;
+            }
+            clearHold();
+            rememberSynced(fp, remote.updated_at);
+            replaceOrgData(data, { resetHistory: true });
+            updateSyncStatus('synced');
+            showToast('Bagan diperbarui dari perangkat lain.');
+        }
+
+        function drainPendingRemote() {
+            if (!pendingRemote || choiceOpen || chartInteraction > 0 || cloudSaveInFlight || reconciling) return;
+            const row = pendingRemote;
+            pendingRemote = null;
+            handleRemoteRow(row);
+        }
+
+        function subscribeRealtime() {
+            if (!cloudClient || realtimeChannel) return;
+            realtimeChannel = cloudClient.channel('org-chart-stk')
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'org_chart_state',
+                    filter: 'id=eq.' + CHART_ID
+                }, payload => {
+                    if (!payload || !payload.new || payload.new.id !== CHART_ID) return;
+                    handleRemoteRow(payload.new);
+                })
+                .subscribe(status => {
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        console.warn('Realtime bagan tidak tersambung:', status);
+                    }
+                });
+        }
+
+        async function submitLogin(event) {
+            event.preventDefault();
+            if (!cloudClient) return;
+            const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
+            const errEl = document.getElementById('loginError');
+            const btn = document.getElementById('loginSubmitBtn');
+            const email = emailInput ? emailInput.value.trim() : '';
+            const password = passwordInput ? passwordInput.value : '';
+            if (errEl) errEl.textContent = '';
+            if (!email || !password) {
+                if (errEl) errEl.textContent = 'Email dan kata sandi wajib diisi.';
+                return;
+            }
+            if (btn) btn.disabled = true;
+            try {
+                const { error } = await cloudClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    if (errEl) errEl.textContent = translateAuthError(error);
+                    return;
+                }
+                closeLoginModal();
+                showToast('Berhasil masuk. Perubahan akan disimpan ke cloud.');
+            } catch (error) {
+                if (errEl) errEl.textContent = 'Tidak terhubung ke server.';
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function signOut() {
+            if (!cloudClient) return;
+            const { error } = await cloudClient.auth.signOut();
+            if (error) {
+                showToast('Gagal keluar. Coba lagi.');
+                return;
+            }
+            authSession = null;
+            updateAuthUi();
+            updateSyncStatus();
+            showToast('Anda sudah keluar. Perubahan baru tidak akan masuk ke cloud.');
+        }
+
+        function bindSyncUi() {
+            const authBtn = document.getElementById('authBtn');
+            if (authBtn) {
+                authBtn.addEventListener('click', () => {
+                    if (authSession) signOut();
+                    else openLoginModal();
+                });
+            }
+            const closeLoginBtn = document.getElementById('closeLoginBtn');
+            if (closeLoginBtn) closeLoginBtn.addEventListener('click', closeLoginModal);
+            const cancelLoginBtn = document.getElementById('cancelLoginBtn');
+            if (cancelLoginBtn) cancelLoginBtn.addEventListener('click', closeLoginModal);
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) loginForm.addEventListener('submit', submitLogin);
+            const loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.addEventListener('mousedown', event => {
+                    if (event.target === loginModal) closeLoginModal();
+                });
+            }
+            const choiceCloudBtn = document.getElementById('choiceUseCloudBtn');
+            if (choiceCloudBtn) {
+                choiceCloudBtn.addEventListener('click', () => chooseCloudVersion(pendingChoiceCloud));
+            }
+            const choiceDeviceBtn = document.getElementById('choiceUseDeviceBtn');
+            if (choiceDeviceBtn) {
+                choiceDeviceBtn.addEventListener('click', () => {
+                    const cloud = pendingChoiceCloud;
+                    chooseDeviceVersion(cloud);
+                });
+            }
+            const bannerCloudBtn = document.getElementById('syncUseCloudBtn');
+            if (bannerCloudBtn) {
+                bannerCloudBtn.addEventListener('click', () => {
+                    const pending = pendingRemote;
+                    pendingRemote = null;
+                    hideSyncBanner();
+                    if (pending) chooseCloudVersion(pending);
+                    else queueReconcile();
+                });
+            }
+            const bannerDeviceBtn = document.getElementById('syncUseDeviceBtn');
+            if (bannerDeviceBtn) {
+                bannerDeviceBtn.addEventListener('click', () => {
+                    const pending = pendingRemote;
+                    pendingRemote = null;
+                    chooseDeviceVersion(pending);
+                });
+            }
+            document.addEventListener('keydown', event => {
+                if (event.key !== 'Escape') return;
+                const modal = document.getElementById('loginModal');
+                if (modal && !modal.classList.contains('hidden')) closeLoginModal();
+            });
+        }
+
+        async function startCloudSync() {
+            if (cloudBootStarted) return;
+            cloudBootStarted = true;
+            bindSyncUi();
+            updateSyncStatus('loading');
+            if (!cloudClient) {
+                lastSyncError = 'Sinkronisasi cloud tidak tersedia. Bagan tetap tersimpan di perangkat ini.';
+                if (!bootPainted) renderNodes();
+                bootFinished = true;
+                cloudReady = true;
+                updateSyncStatus('error');
+                return;
+            }
+
+            cloudClient.auth.onAuthStateChange((event, session) => {
+                authSession = session;
+                updateAuthUi();
+                if (!bootFinished || event === 'INITIAL_SESSION') return;
+                if (event === 'SIGNED_IN') {
+                    cloudWriteBlocked = false;
+                    queueReconcile();
+                } else if (event === 'SIGNED_OUT') {
+                    cloudWriteBlocked = false;
+                    updateSyncStatus();
+                } else if (event === 'TOKEN_REFRESHED') {
+                    scheduleCloudSave();
+                }
+            });
+
+            window.addEventListener('online', () => {
+                lastSyncError = '';
+                queueReconcile();
+            });
+            window.addEventListener('offline', () => updateSyncStatus('offline'));
+
+            try {
+                const { data } = await cloudClient.auth.getSession();
+                authSession = data && data.session ? data.session : null;
+            } catch (error) {
+                console.error(error);
+                authSession = null;
+            }
+            updateAuthUi();
+            bootFinished = true;
+            subscribeRealtime();
+            await queueReconcile();
+            cloudReady = true;
+            if (editedDuringBoot && !choiceOpen) scheduleCloudSave();
         }
 
         // Viewport Transform State (Zoom & Pan)
@@ -680,6 +1614,9 @@
         // Render All Nodes on Canvas
         function renderNodes() {
             if (!container) return;
+            bootPainted = true;
+            const loading = document.getElementById('chartLoading');
+            if (loading) loading.remove();
             container.innerHTML = '';
 
             orgData.forEach(item => {
@@ -689,8 +1626,8 @@
                 node.className = `org-node ${classType} ${selectedNodeIds.has(item.id) ? 'multi-selected' : ''}`;
                 node.style.left = `${item.x}px`;
                 node.style.top = `${item.y}px`;
-                node.setAttribute('data-name', item.name.toLowerCase());
-                node.setAttribute('data-title', item.title.toLowerCase());
+                node.setAttribute('data-name', String(item.name || '').toLowerCase());
+                node.setAttribute('data-title', String(item.title || '').toLowerCase());
 
                 node.innerHTML = `
                     <div class="node-actions">
@@ -698,8 +1635,8 @@
                             <svg class="w-3 h-3 ic" aria-hidden="true"><use href="#i-pencil"/></svg>
                         </button>
                     </div>
-                    <div class="font-bold text-xs truncate max-w-full px-1">${item.name}</div>
-                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${item.title}</div>
+                    <div class="font-bold text-xs truncate max-w-full px-1">${item.name || ''}</div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${item.title || ''}</div>
                 `;
 
                 node.addEventListener('click', (e) => {
@@ -830,6 +1767,7 @@
 
                 function beginDrag() {
                     isDragging = true;
+                    chartInteraction += 1;
                     saveStateToHistory();
 
                     selectedNodeIds.forEach(selectedId => {
@@ -896,6 +1834,8 @@
 
                     updateConnectors();
                     autoSaveToLocalStorage();
+                    chartInteraction = Math.max(0, chartInteraction - 1);
+                    drainPendingRemote();
                 }
 
                 document.addEventListener('mousemove', onMouseMove);
@@ -1595,8 +2535,21 @@
                 updateTransform();
             }, { passive: false });
 
-            renderNodes();
+            let hadLocalCache = false;
+            try { hadLocalCache = !!localStorage.getItem(STORAGE_KEY); } catch (e) { /* abaikan */ }
+            if (hadLocalCache || !navigator.onLine) renderNodes();
             updateTransform();
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(() => { /* halaman tetap jalan tanpa cache offline */ });
+            }
+            startCloudSync().catch(error => {
+                console.error(error);
+                lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
+                if (!bootPainted) renderNodes();
+                bootFinished = true;
+                cloudReady = true;
+                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+            });
         }
 
         if (document.readyState === 'loading') {
