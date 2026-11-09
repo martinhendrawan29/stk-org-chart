@@ -1,4 +1,4 @@
-const CACHE = 'stk-org-chart-shell-v1';
+const CACHE = 'stk-org-chart-shell-v2';
 
 self.addEventListener('install', event => {
   event.waitUntil(
