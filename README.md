@@ -7,7 +7,7 @@ Bagan dibaca dari Supabase (`org_chart_state`, id `stk`) supaya perangkat mana p
 ## Mencoba sinkronisasi
 
 1. Buka halaman. Tombol ubah (tambah, undo, geser kotak) tidak muncul. Status menjadi "Melihat bagan resmi · masuk untuk mengubah", dengan baris "Terakhir diperbarui ..." setelah cloud termuat. Seluruh bagan terlihat di layar; tombol Semua mengulang tampilan itu.
-2. Masuk dengan email dan kata sandi akun STK yang aktif. Tombol ubah muncul.
+2. Masuk dengan username dan kata sandi akun STK yang aktif. Tombol ubah muncul.
 3. Ubah nama, posisi, atau geser kotak. Tunggu status "Tersinkron".
 4. Muat ulang halaman, atau buka situs di browser lain. Bagan yang sama harus muncul.
 5. Keluar. Bagan kembali ke versi cloud, dan tombol ubah hilang lagi.
