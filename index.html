@@ -190,19 +190,31 @@
         }
 
         /* Visual Department & Level Themes */
-        .node-bod {
-            background: linear-gradient(135deg, #0f172a, #1e293b);
+        .node-ceo {
+            background: linear-gradient(135deg, #000000, #18181b);
             color: #ffffff;
-            border-color: #334155;
+            border-color: #27272a;
         }
-        .node-bod .node-title { color: #94a3b8; }
+        .node-ceo .node-name { color: #ffffff; }
+        .node-ceo .node-title { color: #a1a1aa; opacity: 1; }
+        .node-ceo .node-emp { color: #a1a1aa; }
 
-        .node-manager { border-left: 5px solid #8b5cf6; }
+        .node-bod {
+            background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+            color: #ffffff;
+            border-color: #1e3a8a;
+        }
+        .node-bod .node-name { color: #ffffff; }
+        .node-bod .node-title { color: #bfdbfe; opacity: 1; }
+        .node-bod .node-emp { color: #bfdbfe; }
+
+        .node-head { border-left: 5px solid #b45309; }
+        .node-manager { border-left: 5px solid #7c3aed; }
         .node-pm { border-left: 5px solid #f59e0b; }
         .node-sm { border-left: 5px solid #10b981; }
         .node-staff { border-left: 5px solid #3b82f6; }
-        .node-senior_staff { border-left: 5px solid #0284c7; }
-        .node-junior_staff { border-left: 5px solid #10b981; }
+        .node-senior_staff { border-left: 5px solid #0891b2; }
+        .node-junior_staff { border-left: 5px solid #16a34a; }
 
         .node-vacant {
             border: 1.5px dashed #f59e0b !important;
@@ -237,10 +249,6 @@
             color: #64748b;
             font-variant-numeric: tabular-nums;
         }
-        .node-bod .node-emp {
-            color: #94a3b8;
-        }
-
         /* Enhanced Clear Search Highlight Animation */
         .highlight-search {
             outline: 3px solid #6366f1 !important;
@@ -485,10 +493,12 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Tipe Level Area</label>
                     <select id="modalTypeSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="ceo">Level CEO</option>
                         <option value="bod">Level BOD</option>
+                        <option value="head">Level Head</option>
                         <option value="manager">Level Manager</option>
-                        <option value="senior_staff">Level Senior Staff</option>
-                        <option value="junior_staff">Level Junior Staff</option>
+                        <option value="senior_staff">Level Specialist</option>
+                        <option value="junior_staff">Level Associate</option>
                     </select>
                 </div>
                 <div class="pt-2 flex justify-between items-center gap-2">
@@ -585,10 +595,12 @@
 
         // Swimlane Heights & Centers Definition
         const LEVEL_ZONES = [
-            { id: "bod", name: "LEVEL BOD", top: 40, height: 180, centerY: 100, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0f172a", labelColor: "#ffffff" },
-            { id: "manager", name: "LEVEL MANAGER", top: 220, height: 200, centerY: 290, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#8b5cf6", labelColor: "#ffffff" },
-            { id: "senior_staff", name: "LEVEL SENIOR STAFF", top: 420, height: 200, centerY: 490, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0284c7", labelColor: "#ffffff" },
-            { id: "junior_staff", name: "LEVEL JUNIOR STAFF", top: 620, height: 200, centerY: 690, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#10b981", labelColor: "#ffffff" }
+            { id: "ceo", name: "LEVEL CEO", top: 40, height: 180, centerY: 100, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#000000", labelColor: "#ffffff" },
+            { id: "bod", name: "LEVEL BOD", top: 220, height: 200, centerY: 290, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#1d4ed8", labelColor: "#ffffff" },
+            { id: "head", name: "LEVEL HEAD", top: 420, height: 200, centerY: 490, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#b45309", labelColor: "#ffffff" },
+            { id: "manager", name: "LEVEL MANAGER", top: 620, height: 200, centerY: 690, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#7c3aed", labelColor: "#ffffff" },
+            { id: "senior_staff", name: "LEVEL SPECIALIST", top: 820, height: 200, centerY: 890, bg: "rgba(241, 245, 249, 0.5)", labelBg: "#0891b2", labelColor: "#ffffff" },
+            { id: "junior_staff", name: "LEVEL ASSOCIATE", top: 1020, height: 200, centerY: 1090, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#16a34a", labelColor: "#ffffff" }
         ];
 
         // Bagan bawaan sengaja kosong. Nama dan jabatan hanya dimuat dari cloud setelah masuk.
@@ -2341,12 +2353,13 @@
             });
         }
 
-        // Map node Y-level or type to CSS class to guarantee border color
+        // Map node type, or nearest band when the type is custom or missing, to a CSS class.
         function getNodeClassType(item) {
             if (item.type === 'vacant') return 'node-vacant';
-            if (item.type === 'bod') return 'node-bod';
-            
-            // Auto map Y coordinate to appropriate level color if type is custom or missing
+            // ceo and head are level types like bod and manager: a stored type keeps its band style.
+            if (item.type === 'ceo' || item.type === 'bod' || item.type === 'head' || item.type === 'manager' || item.type === 'senior_staff' || item.type === 'junior_staff') {
+                return 'node-' + item.type;
+            }
             const zone = snapToNearestLevelY(item.y);
             return `node-${zone.id}`;
         }
@@ -2965,6 +2978,45 @@
             if (modal) modal.classList.add('hidden');
         }
 
+        // Card paint for SVG/PNG export. Unknown types fall back to the nearest band.
+        function exportAppearanceForLevel(levelId) {
+            if (levelId === 'ceo') {
+                return {
+                    bgFill: 'url(#ceoCardFill)',
+                    strokeColor: '#27272a',
+                    nameColor: '#ffffff',
+                    titleColor: '#a1a1aa',
+                    empColor: '#a1a1aa',
+                    accent: ''
+                };
+            }
+            if (levelId === 'bod') {
+                return {
+                    bgFill: 'url(#bodCardFill)',
+                    strokeColor: '#1e3a8a',
+                    nameColor: '#ffffff',
+                    titleColor: '#bfdbfe',
+                    empColor: '#bfdbfe',
+                    accent: ''
+                };
+            }
+            const accents = {
+                head: '#b45309',
+                manager: '#7c3aed',
+                senior_staff: '#0891b2',
+                junior_staff: '#16a34a'
+            };
+            if (!accents[levelId]) return null;
+            return {
+                bgFill: '#ffffff',
+                strokeColor: '#cbd5e1',
+                nameColor: '#1e293b',
+                titleColor: '#64748b',
+                empColor: '#94a3b8',
+                accent: accents[levelId]
+            };
+        }
+
         // High-Resolution Export
         function exportChartToPng() {
             try {
@@ -3006,26 +3058,28 @@
                     let strokeColor = "#cbd5e1";
                     let nameColor = "#1e293b";
                     let titleColor = "#64748b";
+                    let empColor = "#94a3b8";
                     let accentBar = "";
 
-                    if (item.type === 'bod') {
-                        bgFill = "#0f172a";
-                        strokeColor = "#334155";
-                        nameColor = "#ffffff";
-                        titleColor = "#cbd5e1";
-                    } else if (item.type === 'manager') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#8b5cf6" />`;
-                    else if (item.type === 'senior_staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#0284c7" />`;
-                    else if (item.type === 'junior_staff') accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="#10b981" />`;
-                    else if (item.type === 'vacant') {
+                    if (item.type === 'vacant') {
                         bgFill = "#fffbe8";
                         strokeColor = "#f59e0b";
                     } else {
-                        // Fallback accent bar color according to level
-                        const levelZone = snapToNearestLevelY(item.y);
-                        let barColor = "#10b981";
-                        if (levelZone.id === 'manager') barColor = "#8b5cf6";
-                        if (levelZone.id === 'senior_staff') barColor = "#0284c7";
-                        accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="${barColor}" />`;
+                        let appearance = exportAppearanceForLevel(item.type);
+                        if (!appearance) {
+                            const levelZone = snapToNearestLevelY(item.y);
+                            appearance = exportAppearanceForLevel(levelZone.id);
+                        }
+                        if (appearance) {
+                            bgFill = appearance.bgFill;
+                            strokeColor = appearance.strokeColor;
+                            nameColor = appearance.nameColor;
+                            titleColor = appearance.titleColor;
+                            empColor = appearance.empColor;
+                            if (appearance.accent) {
+                                accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="${appearance.accent}" />`;
+                            }
+                        }
                     }
 
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -3037,7 +3091,7 @@
                             <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1.5" ${item.type === 'vacant' ? 'stroke-dasharray="6 4"' : ''} />
                             ${accentBar}
                             <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="700" fill="${nameColor}">${safeName}</text>
-                            ${empLabel ? `<text x="${nx + 200}" y="${ny + 16}" text-anchor="end" font-family="sans-serif" font-size="8" font-weight="600" fill="#94a3b8">${empLabel}</text>` : ''}
+                            ${empLabel ? `<text x="${nx + 200}" y="${ny + 16}" text-anchor="end" font-family="sans-serif" font-size="8" font-weight="600" fill="${empColor}">${empLabel}</text>` : ''}
                             <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="500" fill="${titleColor}">${safeTitle}</text>
                         </g>
                     `;
@@ -3045,6 +3099,14 @@
 
                 const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">
                     <defs>
+                        <linearGradient id="ceoCardFill" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#000000" />
+                            <stop offset="100%" stop-color="#18181b" />
+                        </linearGradient>
+                        <linearGradient id="bodCardFill" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#1e3a8a" />
+                            <stop offset="100%" stop-color="#1d4ed8" />
+                        </linearGradient>
                         <marker id="arrowExport" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
                         </marker>
