@@ -109,8 +109,26 @@
             transition: border-color 0.15s, box-shadow 0.15s, transform 0.2s ease-in-out;
         }
 
-        /* Pengunjung yang belum masuk hanya melihat. Tombol ubah disembunyikan dari awal
-           supaya tidak sempat muncul sebelum skrip tahu status masuk. */
+        /* Sebelum masuk, bagan tidak boleh terlihat. Tombol ubah tetap disembunyikan
+           sampai sesi Supabase valid, lalu akun yang masuk dapat mengubah bagan. */
+        body.auth-locked {
+            background-color: #0f172a !important;
+        }
+        body.auth-locked header,
+        body.auth-locked #syncBanner,
+        body.auth-locked #viewport,
+        body.auth-locked #toast,
+        body.auth-locked #nodeModal,
+        body.auth-locked #confirmModal,
+        body.auth-locked #choiceModal {
+            visibility: hidden !important;
+        }
+        body.auth-locked .org-node {
+            display: none !important;
+        }
+        #authGate {
+            background-color: #0f172a;
+        }
         body:not(.can-edit) .edit-only {
             display: none !important;
         }
@@ -268,7 +286,7 @@
         }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-800">
+<body class="auth-locked h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-800">
     <!-- Icon sprite (lucide, ISC license), inline supaya icon tidak hilang kalau CDN diblokir -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
         <symbol id="i-network" viewBox="0 0 24 24"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></symbol>
@@ -375,6 +393,12 @@
     <!-- MAIN VIEWPORT CANVAS WITH TRANSFORMER -->
     <main id="viewport" class="">
         <div id="chartLoading" class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-500 z-20">Memuat bagan...</div>
+        <div id="chartEmpty" class="hidden absolute inset-0 z-20 flex items-center justify-center p-6">
+            <div class="max-w-sm rounded-2xl border border-slate-200 bg-white px-6 py-5 text-center shadow-sm">
+                <p class="text-sm font-semibold text-slate-800">Bagan tidak tersedia</p>
+                <p class="mt-1 text-xs text-slate-500 leading-relaxed">Akun ini tidak menerima data bagan. Bagan kosong tidak disimpan.</p>
+            </div>
+        </div>
         <div id="chartTransformer">
             <div id="chartArea">
                 <!-- Swimlanes Background -->
@@ -410,7 +434,7 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Lengkap</label>
-                    <input type="text" id="modalName" required placeholder="Contoh: Budi Setiawan" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 capitalize">
+                    <input type="text" id="modalName" required placeholder="Nama lengkap" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 capitalize">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Jabatan / Posisi</label>
@@ -464,15 +488,22 @@
 
     <div id="toast" role="status" aria-live="polite"></div>
 
-    <!-- LOGIN -->
-    <div id="loginModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[120] hidden flex items-center justify-center p-4">
+    <!-- GERBANG MASUK: bagan tidak ditampilkan sebelum sesi Supabase valid -->
+    <div id="authGate" class="fixed inset-0 z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="authGateTitle">
         <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden">
-            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                <h3 class="font-bold text-slate-800 text-sm">Masuk untuk menyimpan bagan</h3>
-                <button type="button" id="closeLoginBtn" class="text-slate-400 hover:text-slate-600" aria-label="Tutup"><svg class="w-5 h-5 ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+            <div class="px-6 py-5 bg-slate-50 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 text-white p-2 rounded-xl shadow">
+                        <svg class="w-5 h-5 ic" aria-hidden="true"><use href="#i-network"/></svg>
+                    </div>
+                    <div>
+                        <h2 id="authGateTitle" class="font-bold text-slate-900 text-base leading-tight">STK Organization Chart</h2>
+                        <p class="text-xs text-slate-500 font-medium mt-0.5">Masuk untuk melihat bagan</p>
+                    </div>
+                </div>
             </div>
             <form id="loginForm" class="p-6 space-y-4">
-                <p class="text-xs text-slate-600 leading-relaxed">Bagan resmi bisa dilihat tanpa masuk. Untuk mengubah bagan dan menyimpannya ke cloud, masuk dengan akun STK yang aktif.</p>
+                <p class="text-xs text-slate-600 leading-relaxed">Bagan struktur organisasi hanya dapat dilihat setelah masuk dengan akun STK yang aktif.</p>
                 <div>
                     <label for="loginUsername" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Username</label>
                     <input type="text" id="loginUsername" name="username" autocomplete="username" autocapitalize="off" required placeholder="nama" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
@@ -482,10 +513,7 @@
                     <input type="password" id="loginPassword" autocomplete="current-password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                 </div>
                 <p id="loginError" class="text-xs font-semibold text-red-600 min-h-[1rem]" role="alert"></p>
-                <div class="flex justify-end gap-2">
-                    <button type="button" id="cancelLoginBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">Batal</button>
-                    <button type="submit" id="loginSubmitBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow disabled:opacity-60">Masuk</button>
-                </div>
+                <button type="submit" id="loginSubmitBtn" class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition shadow disabled:opacity-60">Masuk</button>
             </form>
         </div>
     </div>
@@ -519,8 +547,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.86.2/dist/umd/supabase.js"></script>
     <script>
-        // LocalStorage Key (Version 13, naik karena layout default berubah)
-        const STORAGE_KEY = 'STK_ORG_CHART_DATA_V13';
+        // LocalStorage Key (Version 14: bagan bawaan dikosongkan, cache lama tidak dibaca)
+        const STORAGE_KEY = 'STK_ORG_CHART_DATA_V14';
 
         // Swimlane Heights & Centers Definition
         const LEVEL_ZONES = [
@@ -530,73 +558,10 @@
             { id: "junior_staff", name: "LEVEL JUNIOR STAFF", top: 620, height: 200, centerY: 690, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#10b981", labelColor: "#ffffff" }
         ];
 
-        // Initial Organogram Data, mengikuti gambar referensi (posisi x, level, dan atasan).
-        // Jarak antar node satu level minimal 20px, jalur konektor tidak menembus node lain.
-        const defaultOrgData = [
-            // C-LEVEL (BOD)
-            { id: "ceo", name: "Erwin Suryawangi", title: "CEO", parent: null, type: "bod", x: 320, y: 100 },
-            { id: "cfo", name: "Ivan Sutanto", title: "CFO", parent: null, type: "bod", x: 964, y: 100 },
-            { id: "coo", name: "Budi Setiawan", title: "COO", parent: null, type: "bod", x: 2660, y: 100 },
+        // Bagan bawaan sengaja kosong. Nama dan jabatan hanya dimuat dari cloud setelah masuk.
+        const defaultOrgData = [];
 
-            // UNDER CEO (ERWIN)
-            { id: "sales_mgr", name: "Martin Hendrawan", title: "Sales & Marketing Manager", parent: "ceo", type: "manager", x: 320, y: 290 },
-            { id: "csm_spec", name: "Lahana Nirwanda Artami", title: "Community & Social Media Spec.", parent: "sales_mgr", type: "junior_staff", x: 320, y: 690 },
-
-            // UNDER CFO (IVAN)
-            { id: "fin_mgr", name: "Siti Romlah", title: "Finance Manager", parent: "cfo", type: "manager", x: 714, y: 290 },
-            { id: "hr_mgr", name: "Dewi Ariyani", title: "HRGA Manager", parent: "cfo", type: "manager", x: 964, y: 290 },
-            { id: "qs_vacant", name: "Quantity Surveyor (Vacant)", title: "Quantity Surveyor", parent: "cfo", type: "vacant", x: 1124, y: 490 },
-            { id: "estimator_staff", name: "Indah Fitria Rahami", title: "Estimator Staff", parent: "qs_vacant", type: "junior_staff", x: 1124, y: 690 },
-
-            // UNDER FINANCE MGR (SITI ROMLAH)
-            { id: "sr_purchasing", name: "Putri Natasya", title: "Senior Purchasing", parent: "fin_mgr", type: "senior_staff", x: 714, y: 490 },
-            { id: "fin_staff", name: "Rahma Virani Lintang Utomo", title: "Finance & Acct Staff", parent: "fin_mgr", type: "junior_staff", x: 587, y: 690 },
-            { id: "purchasing_staff", name: "Siti Mayrina Nurazizah", title: "Purchasing Staff", parent: "fin_mgr", type: "junior_staff", x: 842, y: 690 },
-
-            // UNDER COO (BUDI) - TIM 1 (ARIF)
-            { id: "pm_arif", name: "Arif Saifurrochim", title: "Project Manager", parent: "coo", type: "manager", x: 1620, y: 290 },
-            { id: "sm_helmy", name: "Helmy Setiawan", title: "Site Manager", parent: "pm_arif", type: "senior_staff", x: 1390, y: 490 },
-            { id: "sm_imam", name: "Imam Yuddi P", title: "Site Manager", parent: "pm_arif", type: "senior_staff", x: 1620, y: 490 },
-            { id: "pc_khoirus", name: "Khoirus Syahira", title: "Project Coordinator", parent: "pm_arif", type: "senior_staff", x: 1850, y: 490 },
-            { id: "log_zulkifli", name: "Zulkifli", title: "Logistic Staff", parent: "sm_helmy", type: "junior_staff", x: 1390, y: 690 },
-            { id: "log_yasin", name: "Yasin Muchamad Ilham", title: "Logistic Staff", parent: "sm_imam", type: "junior_staff", x: 1620, y: 690 },
-
-            // UNDER COO - TIM 2 (REZA)
-            { id: "pm_reza", name: "Muhammad Reza Pahlevi H.", title: "Project Manager", parent: "coo", type: "manager", x: 2435, y: 290 },
-            { id: "sm_trias", name: "Trias Kusuma Nugraha", title: "Site Manager", parent: "pm_reza", type: "senior_staff", x: 2090, y: 490 },
-            { id: "sm_barkah", name: "Barkah Tri Abdi", title: "Site Manager", parent: "pm_reza", type: "senior_staff", x: 2320, y: 490 },
-            { id: "sm_denny", name: "Denny Fitrianto Saidi", title: "Site Manager", parent: "pm_reza", type: "senior_staff", x: 2550, y: 490 },
-            { id: "pc_ayufy", name: "Ayufy Riska Helmida", title: "Project Coordinator", parent: "pm_reza", type: "senior_staff", x: 2780, y: 490 },
-            { id: "log_tri", name: "Tri Aditya Setiawan", title: "Logistic Staff", parent: "sm_trias", type: "junior_staff", x: 2090, y: 690 },
-            { id: "log_agung", name: "Agung Satryo Leksono", title: "Logistic Staff", parent: "sm_barkah", type: "junior_staff", x: 2320, y: 690 },
-            { id: "log_tomy", name: "Tomy Rizki Gumilar", title: "Logistic Staff", parent: "sm_denny", type: "junior_staff", x: 2550, y: 690 },
-
-            // UNDER COO - TIM 3 (TONI)
-            { id: "pm_toni", name: "Toni Oki Pratama", title: "Jr Project Manager", parent: "coo", type: "manager", x: 2930, y: 290 },
-            { id: "sm_idris", name: "Idris Albawavi", title: "Site Manager", parent: "pm_toni", type: "senior_staff", x: 3070, y: 490 },
-            { id: "sm_ismawan", name: "Ismawan Adhi Ramadhan", title: "Site Manager", parent: "pm_toni", type: "senior_staff", x: 3300, y: 490 },
-            { id: "pc_rahma", name: "Rahma Dwi Nur Hijriah", title: "Project Coordinator", parent: "pm_toni", type: "senior_staff", x: 3530, y: 490 },
-            { id: "log_hanif", name: "Muhammad Hanif", title: "Logistic Staff", parent: "pm_toni", type: "junior_staff", x: 2930, y: 690 },
-
-            // UNDER COO - TIM 4 (TOPO)
-            { id: "pm_sutopo", name: "Sutopo", title: "Senior Site Manager", parent: "coo", type: "manager", x: 3895, y: 290 },
-            { id: "sm_reza_a", name: "Reza Afrilianto", title: "Site Manager", parent: "pm_sutopo", type: "senior_staff", x: 3780, y: 490 },
-            { id: "pc_anik", name: "Anik Purmiati", title: "Project Coordinator", parent: "pm_sutopo", type: "senior_staff", x: 4010, y: 490 },
-            { id: "log_ian", name: "Ian Setiawan", title: "Logistic Staff", parent: "sm_reza_a", type: "junior_staff", x: 3780, y: 690 }
-        ];
-
-        // Load data from LocalStorage or Fallback
-        function loadSavedData() {
-            try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) return JSON.parse(saved);
-            } catch (e) {
-                console.error("Gagal memuat dari local storage", e);
-            }
-            return JSON.parse(JSON.stringify(defaultOrgData));
-        }
-
-        let orgData = loadSavedData();
+        let orgData = [];
 
         // Undo & Redo History Stack Implementation
         let historyStack = [];
@@ -691,6 +656,8 @@
         let pendingRemote = null;
         let chartInteraction = 0;
         let realtimeChannel = null;
+        let realtimeGen = 0;
+        let signedInToken = '';
         let reconcileChain = Promise.resolve();
         let defaultChartFingerprint = null;
         let authEpoch = 0;
@@ -822,6 +789,45 @@
             try { localStorage.removeItem(HOLD_KEY); } catch (e) { /* abaikan */ }
         }
 
+        function chartCacheKeys() {
+            const keys = [];
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.indexOf('STK_ORG_CHART_') === 0) keys.push(key);
+                }
+            } catch (e) { /* abaikan */ }
+            return keys;
+        }
+
+        function clearLegacyChartCache() {
+            const current = [STORAGE_KEY, META_KEY, HOLD_KEY];
+            chartCacheKeys().forEach(key => {
+                if (current.indexOf(key) !== -1) return;
+                try { localStorage.removeItem(key); } catch (e) { /* abaikan */ }
+            });
+        }
+
+        function clearLocalChartCache() {
+            chartCacheKeys().forEach(key => {
+                try { localStorage.removeItem(key); } catch (e) { /* abaikan */ }
+            });
+        }
+
+        function clearChartIndexedDb() {
+            if (!window.indexedDB || typeof indexedDB.databases !== 'function') return Promise.resolve();
+            return indexedDB.databases().then(dbs => Promise.all((dbs || []).map(db => {
+                const name = String((db && db.name) || '');
+                if (!name || !/org[_-]?chart|stk[_-]?org/i.test(name)) return Promise.resolve();
+                return new Promise(resolve => {
+                    const req = indexedDB.deleteDatabase(name);
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => resolve();
+                    req.onblocked = () => resolve();
+                });
+            }))).catch(() => {});
+        }
+
         function rememberSynced(fp, updatedAt, data) {
             cloudFingerprint = fp;
             cloudUpdatedAt = updatedAt || cloudUpdatedAt;
@@ -861,6 +867,13 @@
         }
 
         function replaceOrgData(next, options) {
+            if (!authSession) return;
+            if (!Array.isArray(next) || next.length === 0) {
+                orgData = [];
+                showEmptyChartMessage();
+                updateSyncStatus('empty');
+                return;
+            }
             orgData = JSON.parse(JSON.stringify(next));
             if (options && options.resetHistory) {
                 historyStack = [];
@@ -923,12 +936,15 @@
             } else if (mode === 'saving' || cloudSaveInFlight) {
                 label = 'Menyimpan ke cloud...';
                 color = '#fbbf24';
+            } else if (mode === 'empty') {
+                label = 'Bagan tidak tersedia';
+                color = '#f59e0b';
             } else if (mode === 'error' || (cloudWriteBlocked && dirty)) {
                 label = lastSyncError || 'Gagal menyimpan ke cloud';
                 color = '#ef4444';
             } else if (!authSession) {
-                label = 'Melihat bagan resmi · masuk untuk mengubah';
-                color = '#10b981';
+                label = 'Masuk untuk melihat bagan';
+                color = '#94a3b8';
             } else if (dirty) {
                 label = 'Perubahan belum terkirim';
                 color = '#fbbf24';
@@ -968,7 +984,7 @@
                 btn.title = 'Keluar dari akun ' + account;
             } else {
                 label.textContent = 'Masuk';
-                btn.title = 'Masuk untuk mengubah dan menyimpan bagan';
+                btn.title = 'Masuk untuk melihat dan mengubah bagan';
             }
             updateEditModeUi();
             if (bootFinished) updateSyncStatus();
@@ -991,8 +1007,8 @@
                 historyStack = [];
                 redoStack = [];
             }
-            // Saat keluar dan salinan resmi sudah ada, presentOfficialChart yang menggambar ulang.
-            if (bootPainted && container && !(leavingEdit && officialChart)) renderNodes();
+            // Keluar mengosongkan kanvas lewat lockSession. Jangan gambar ulang bagan yang baru dihapus.
+            if (bootPainted && container && !(leavingEdit && officialChart) && authSession) renderNodes();
         }
 
         function translateAuthError(error) {
@@ -1004,20 +1020,110 @@
             return 'Gagal masuk. Coba lagi.';
         }
 
-        function openLoginModal() {
-            const modal = document.getElementById('loginModal');
-            const err = document.getElementById('loginError');
-            if (err) err.textContent = '';
-            if (modal) modal.classList.remove('hidden');
+        function setChartLoading(show) {
+            const loading = document.getElementById('chartLoading');
+            if (!loading) return;
+            loading.textContent = 'Memuat bagan...';
+            loading.classList.toggle('hidden', !show);
+        }
+
+        function hideEmptyChartMessage() {
+            const el = document.getElementById('chartEmpty');
+            if (el) el.classList.add('hidden');
+        }
+
+        function showEmptyChartMessage() {
+            setChartLoading(false);
+            const el = document.getElementById('chartEmpty');
+            if (el) el.classList.remove('hidden');
+            if (container) container.innerHTML = '';
+            if (svg) svg.innerHTML = '';
+            bootPainted = true;
+        }
+
+        function showAuthGate() {
+            document.body.classList.add('auth-locked');
+            const gate = document.getElementById('authGate');
+            if (gate) {
+                gate.classList.remove('hidden');
+                gate.setAttribute('aria-hidden', 'false');
+            }
+            const password = document.getElementById('loginPassword');
+            if (password) password.value = '';
+            const btn = document.getElementById('loginSubmitBtn');
+            if (btn) btn.disabled = false;
             const username = document.getElementById('loginUsername');
             if (username) username.focus();
         }
 
-        function closeLoginModal() {
-            const modal = document.getElementById('loginModal');
-            if (modal) modal.classList.add('hidden');
-            const password = document.getElementById('loginPassword');
-            if (password) password.value = '';
+        function hideAuthGate() {
+            document.body.classList.remove('auth-locked');
+            const gate = document.getElementById('authGate');
+            if (gate) {
+                gate.classList.add('hidden');
+                gate.setAttribute('aria-hidden', 'true');
+            }
+        }
+
+        function openLoginModal() {
+            const err = document.getElementById('loginError');
+            if (err) err.textContent = '';
+            showAuthGate();
+        }
+
+        function clearRenderedChart() {
+            orgData = [];
+            officialChart = null;
+            cloudFingerprint = null;
+            cloudUpdatedAt = null;
+            historyStack = [];
+            redoStack = [];
+            if (typeof selectedNodeIds !== 'undefined' && selectedNodeIds) selectedNodeIds.clear();
+            bootPainted = false;
+            sawOfficialChart = false;
+            userAdjustedView = false;
+            if (container) container.innerHTML = '';
+            if (svg) svg.innerHTML = '';
+            hideEmptyChartMessage();
+            setChartLoading(false);
+            updateLastUpdatedLabel();
+        }
+
+        function lockSession() {
+            authEpoch += 1;
+            signedInToken = '';
+            authSession = null;
+            unsubscribeRealtime();
+            clearTimeout(cloudSaveTimer);
+            cloudSaveTimer = null;
+            cloudSaveQueued = false;
+            cloudSaveInFlight = false;
+            cloudReady = false;
+            cloudWriteBlocked = false;
+            reconciling = false;
+            editedDuringBoot = false;
+            lastPushedFingerprint = null;
+            pendingRemote = null;
+            pendingChoiceCloud = null;
+            hideSyncBanner();
+            closeChoiceModal();
+            closeModal();
+            closeConfirmModal();
+            if (typeof isConnectingMode !== 'undefined' && isConnectingMode) toggleConnectMode();
+            clearRenderedChart();
+            clearLocalChartCache();
+            clearChartIndexedDb();
+            const err = document.getElementById('loginError');
+            if (err) err.textContent = '';
+            showAuthGate();
+            updateAuthUi();
+        }
+
+        function forceLocalSignOut() {
+            const client = cloudClient;
+            lockSession();
+            if (!client) return;
+            client.auth.signOut({ scope: 'local' }).catch(() => {});
         }
 
         function updateChoiceCopy() {
@@ -1103,7 +1209,21 @@
             showToast('Versi perangkat ini dipertahankan. Masuk untuk menyimpannya ke cloud.');
         }
 
+        function isAuthFailure(error) {
+            if (!error) return false;
+            const status = Number(error.status || error.statusCode || 0);
+            if (status === 401) return true;
+            const code = String(error.code || '');
+            if (code === 'PGRST301' || code === '401') return true;
+            const msg = String(error.message || '').toLowerCase();
+            if (msg.includes('jwt')) return true;
+            if (msg.includes('invalid refresh token') || msg.includes('refresh token not found')) return true;
+            if (msg.includes('session expired') || msg.includes('invalid claim')) return true;
+            return false;
+        }
+
         async function fetchCloudRow() {
+            if (!cloudClient || !authSession) return null;
             const controller = typeof AbortController === 'function' ? new AbortController() : null;
             const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
             let query = cloudClient
@@ -1119,7 +1239,11 @@
             } finally {
                 if (timer) clearTimeout(timer);
             }
-            if (error) throw error;
+            if (error) {
+                const code = String(error.code || '');
+                if (code === 'PGRST116') return null;
+                throw error;
+            }
             if (!data) return null;
             const chart = coerceChart(data.data);
             if (!chart) throw new Error('Data bagan cloud tidak valid');
@@ -1163,6 +1287,12 @@
         }
 
         function scheduleCloudSave() {
+            if (!orgData.length) {
+                clearTimeout(cloudSaveTimer);
+                cloudSaveTimer = null;
+                if (bootFinished && authSession) updateSyncStatus('empty');
+                return;
+            }
             if (!cloudClient || !cloudReady || reconciling || choiceOpen || cloudWriteBlocked || !authSession) {
                 updateSyncStatus();
                 return;
@@ -1189,6 +1319,10 @@
                 return { ok: false, reason: 'queued' };
             }
             const snapshot = JSON.parse(JSON.stringify(orgData));
+            if (!Array.isArray(snapshot) || snapshot.length === 0) {
+                updateSyncStatus('empty');
+                return { ok: false, reason: 'empty' };
+            }
             const snapshotFp = chartFingerprint(snapshot);
             if (snapshotFp === cloudFingerprint) {
                 rememberSynced(snapshotFp, cloudUpdatedAt);
@@ -1309,9 +1443,16 @@
         }
 
         async function pullAndReconcile() {
-            if (!cloudClient) return;
+            if (!cloudClient || !authSession) return;
             const epoch = authEpoch;
             const startedSignedIn = canEdit();
+            if (!orgData.length && !editedDuringBoot) {
+                const cached = readDeviceCache();
+                if (cached.present && cached.data && cached.data.length) {
+                    orgData = JSON.parse(JSON.stringify(cached.data));
+                }
+            }
+            if (!bootPainted) setChartLoading(true);
             if (choiceOpen && pendingChoiceCloud) {
                 try {
                     const fresh = await fetchCloudRow();
@@ -1340,10 +1481,27 @@
                 cloudRow = await fetchCloudRow();
             } catch (error) {
                 console.error(error);
-                lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
-                if (!bootPainted) renderNodes();
-                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
                 reconciling = false;
+                if (epoch !== authEpoch || !authSession) return;
+                if (isAuthFailure(error)) {
+                    forceLocalSignOut();
+                    return;
+                }
+                const cache = readDeviceCache();
+                if (cache.present && cache.data && cache.data.length) {
+                    orgData = JSON.parse(JSON.stringify(cache.data));
+                    hydrateOfficialMetaFromCache();
+                    renderNodes();
+                    autoFitChart('official');
+                    lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
+                    updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                } else {
+                    orgData = [];
+                    lastSyncError = 'Tidak dapat memuat bagan cloud.';
+                    showEmptyChartMessage();
+                    updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                }
+                cloudReady = true;
                 return;
             }
 
@@ -1359,27 +1517,18 @@
             const cacheFp = cacheAtStart.present ? chartFingerprint(cacheAtStart.data) : '';
             const mirrored = !!(metaAtStart && cacheAtStart.present && cacheFp === metaAtStart.cloudFp);
 
-            if (!cloudRow) {
-                if (!bootPainted) renderNodes();
-                if (startedSignedIn && epoch === authEpoch && canEdit()) {
-                    const inserted = await insertSnapshot(JSON.parse(JSON.stringify(orgData)));
-                    if (epoch !== authEpoch || !canEdit()) {
-                        reconciling = false;
-                        return;
-                    }
-                    if (inserted.ok) {
-                        clearHold();
-                        rememberSynced(chartFingerprint(orgData), inserted.updated_at, orgData);
-                        updateSyncStatus('synced');
-                    } else {
-                        cloudWriteBlocked = true;
-                        lastSyncError = 'Akun ini tidak berhak menyimpan bagan. Pastikan akun STK Anda aktif.';
-                        updateSyncStatus('error');
-                    }
-                } else {
-                    updateSyncStatus();
-                }
+            if (epoch !== authEpoch || !authSession) {
                 reconciling = false;
+                return;
+            }
+
+            if (!cloudRow || !Array.isArray(cloudRow.data) || cloudRow.data.length === 0) {
+                // Nol baris (RLS atau baris kosong): tampilkan pesan, jangan timpa data remote.
+                orgData = [];
+                showEmptyChartMessage();
+                updateSyncStatus('empty');
+                reconciling = false;
+                cloudReady = true;
                 return;
             }
 
@@ -1409,8 +1558,15 @@
                 mirroredFp: metaAtStart ? metaAtStart.cloudFp : null
             });
             reconciling = false;
-            if (epoch !== authEpoch) return;
+            if (epoch !== authEpoch || !authSession) return;
+            cloudReady = true;
             if (decision && decision.action === 'upload-device') {
+                if (!orgData.length) {
+                    replaceOrgData(cloudRow.data, { resetHistory: true });
+                    rememberSynced(chartFingerprint(cloudRow.data), cloudRow.updated_at, cloudRow.data);
+                    updateSyncStatus('synced');
+                    return;
+                }
                 const result = await flushCloudSave();
                 if (result && result.ok && !result.already && decision.reason === 'migrate-seed') {
                     showToast('Bagan di perangkat ini diunggah ke cloud.');
@@ -1421,17 +1577,31 @@
         function queueReconcile() {
             reconcileChain = reconcileChain.then(() => pullAndReconcile()).catch(error => {
                 console.error(error);
-                lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
-                if (!bootPainted) renderNodes();
-                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
                 reconciling = false;
+                if (!authSession) return;
+                if (isAuthFailure(error)) {
+                    forceLocalSignOut();
+                    return;
+                }
+                lastSyncError = 'Tidak dapat memuat bagan cloud.';
+                if (!bootPainted) showEmptyChartMessage();
+                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                cloudReady = true;
             });
             return reconcileChain;
         }
 
         function handleRemoteRow(row) {
+            if (!authSession) return;
             const data = coerceChart(row && row.data);
             if (!data) return;
+            if (data.length === 0) {
+                orgData = [];
+                showEmptyChartMessage();
+                rememberCloudBase(chartFingerprint(data), row.updated_at);
+                updateSyncStatus('empty');
+                return;
+            }
             const fp = chartFingerprint(data);
             const remote = { data, updated_at: row.updated_at };
             if (fp === chartFingerprint(orgData)) {
@@ -1487,23 +1657,85 @@
             handleRemoteRow(row);
         }
 
+        function unsubscribeRealtime() {
+            realtimeGen += 1;
+            const channel = realtimeChannel;
+            realtimeChannel = null;
+            if (!channel || !cloudClient) return;
+            try {
+                const result = cloudClient.removeChannel(channel);
+                if (result && typeof result.catch === 'function') result.catch(() => {});
+            } catch (e) {
+                try { channel.unsubscribe(); } catch (e2) { /* abaikan */ }
+            }
+        }
+
         function subscribeRealtime() {
-            if (!cloudClient || realtimeChannel) return;
-            realtimeChannel = cloudClient.channel('org-chart-stk')
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'org_chart_state',
-                    filter: 'id=eq.' + CHART_ID
-                }, payload => {
-                    if (!payload || !payload.new || payload.new.id !== CHART_ID) return;
-                    handleRemoteRow(payload.new);
-                })
-                .subscribe(status => {
-                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                        console.warn('Realtime bagan tidak tersambung:', status);
+            if (!cloudClient || !authSession || !authSession.access_token || realtimeChannel) return;
+            const gen = ++realtimeGen;
+            const token = authSession.access_token;
+            const channel = cloudClient.channel('org-chart-stk');
+            realtimeChannel = channel;
+            Promise.resolve()
+                .then(() => cloudClient.realtime.setAuth(token))
+                .catch(() => {})
+                .then(() => {
+                    if (gen !== realtimeGen || realtimeChannel !== channel || !authSession || authSession.access_token !== token) {
+                        return;
                     }
+                    channel.on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'org_chart_state',
+                        filter: 'id=eq.' + CHART_ID
+                    }, payload => {
+                        if (!authSession) return;
+                        if (!payload || !payload.new || payload.new.id !== CHART_ID) return;
+                        handleRemoteRow(payload.new);
+                    }).subscribe(status => {
+                        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            console.warn('Realtime bagan tidak tersambung:', status);
+                        }
+                    });
                 });
+        }
+
+        function refreshRealtimeAuth(session) {
+            if (!session || !session.access_token) {
+                lockSession();
+                return;
+            }
+            authSession = session;
+            signedInToken = session.access_token;
+            unsubscribeRealtime();
+            subscribeRealtime();
+            updateAuthUi();
+        }
+
+        function enterSignedIn(session) {
+            if (!session || !session.user) return;
+            const token = session.access_token || '';
+            if (signedInToken === token && realtimeChannel && !document.body.classList.contains('auth-locked')) {
+                authSession = session;
+                updateAuthUi();
+                return;
+            }
+            signedInToken = token;
+            authSession = session;
+            authEpoch += 1;
+            cloudWriteBlocked = false;
+            clearHold();
+            clearLegacyChartCache();
+            hideAuthGate();
+            updateAuthUi();
+            setChartLoading(true);
+            subscribeRealtime();
+            const epoch = authEpoch;
+            queueReconcile().then(() => {
+                if (epoch !== authEpoch || !authSession) return;
+                cloudReady = true;
+                if (editedDuringBoot && !choiceOpen) scheduleCloudSave();
+            });
         }
 
         async function submitLogin(event) {
@@ -1527,8 +1759,9 @@
                     if (errEl) errEl.textContent = translateAuthError(error);
                     return;
                 }
-                closeLoginModal();
-                showToast('Berhasil masuk. Perubahan akan disimpan ke cloud.');
+                const passwordField = document.getElementById('loginPassword');
+                if (passwordField) passwordField.value = '';
+                showToast('Berhasil masuk.');
             } catch (error) {
                 if (errEl) errEl.textContent = 'Tidak terhubung ke server.';
             } finally {
@@ -1537,7 +1770,10 @@
         }
 
         async function signOut() {
-            if (!cloudClient) return;
+            if (!cloudClient) {
+                lockSession();
+                return;
+            }
             clearTimeout(cloudSaveTimer);
             cloudSaveTimer = null;
             cloudSaveQueued = false;
@@ -1547,49 +1783,7 @@
                 if (canEdit()) scheduleCloudSave();
                 return;
             }
-        }
-
-        // Setelah keluar, buang perubahan yang belum terkirim dan tampilkan bagan cloud.
-        async function presentOfficialChart(epoch) {
-            clearTimeout(cloudSaveTimer);
-            cloudSaveTimer = null;
-            cloudSaveQueued = false;
-            pendingRemote = null;
-            editedDuringBoot = false;
-            hideSyncBanner();
-            closeChoiceModal();
-            clearHold();
-            if (isConnectingMode) toggleConnectMode();
-            closeModal();
-            closeConfirmModal();
-            clearMultiSelection();
-            historyStack = [];
-            redoStack = [];
-
-            if (officialChart) {
-                cloudFingerprint = chartFingerprint(officialChart);
-                replaceOrgData(officialChart, { resetHistory: true, fit: 'force' });
-            }
-
-            let cloud = null;
-            try {
-                cloud = await fetchCloudRow();
-            } catch (error) {
-                console.error(error);
-            }
-            if (epoch !== authEpoch || canEdit()) return;
-            if (cloud) {
-                clearHold();
-                rememberSynced(chartFingerprint(cloud.data), cloud.updated_at, cloud.data);
-                replaceOrgData(cloud.data, { resetHistory: true, fit: 'force' });
-                updateSyncStatus('synced');
-                showToast('Anda sudah keluar. Menampilkan bagan resmi.');
-                return;
-            }
-            updateSyncStatus(officialChart ? (navigator.onLine ? 'error' : 'offline') : (navigator.onLine ? 'error' : 'offline'));
-            showToast(officialChart
-                ? 'Anda sudah keluar. Menampilkan salinan resmi terakhir.'
-                : 'Anda sudah keluar. Bagan cloud belum bisa dimuat.');
+            if (authSession || !document.body.classList.contains('auth-locked')) lockSession();
         }
 
         function bindSyncUi() {
@@ -1600,18 +1794,8 @@
                     else openLoginModal();
                 });
             }
-            const closeLoginBtn = document.getElementById('closeLoginBtn');
-            if (closeLoginBtn) closeLoginBtn.addEventListener('click', closeLoginModal);
-            const cancelLoginBtn = document.getElementById('cancelLoginBtn');
-            if (cancelLoginBtn) cancelLoginBtn.addEventListener('click', closeLoginModal);
             const loginForm = document.getElementById('loginForm');
             if (loginForm) loginForm.addEventListener('submit', submitLogin);
-            const loginModal = document.getElementById('loginModal');
-            if (loginModal) {
-                loginModal.addEventListener('mousedown', event => {
-                    if (event.target === loginModal) closeLoginModal();
-                });
-            }
             const choiceCloudBtn = document.getElementById('choiceUseCloudBtn');
             if (choiceCloudBtn) {
                 choiceCloudBtn.addEventListener('click', () => chooseCloudVersion(pendingChoiceCloud));
@@ -1641,64 +1825,57 @@
                     chooseDeviceVersion(pending);
                 });
             }
-            document.addEventListener('keydown', event => {
-                if (event.key !== 'Escape') return;
-                const modal = document.getElementById('loginModal');
-                if (modal && !modal.classList.contains('hidden')) closeLoginModal();
-            });
         }
 
         async function startCloudSync() {
             if (cloudBootStarted) return;
             cloudBootStarted = true;
             bindSyncUi();
-            updateSyncStatus('loading');
+            showAuthGate();
             if (!cloudClient) {
-                lastSyncError = 'Sinkronisasi cloud tidak tersedia. Bagan tetap tersimpan di perangkat ini.';
-                if (!bootPainted) renderNodes();
                 bootFinished = true;
-                cloudReady = true;
-                updateSyncStatus('error');
+                const errEl = document.getElementById('loginError');
+                if (errEl) errEl.textContent = 'Tidak terhubung ke server.';
                 return;
             }
 
             cloudClient.auth.onAuthStateChange((event, session) => {
-                authSession = session;
-                updateAuthUi();
                 if (!bootFinished || event === 'INITIAL_SESSION') return;
                 if (event === 'SIGNED_IN') {
-                    authEpoch += 1;
-                    cloudWriteBlocked = false;
-                    queueReconcile();
-                } else if (event === 'SIGNED_OUT') {
-                    authEpoch += 1;
-                    cloudWriteBlocked = false;
-                    const epoch = authEpoch;
-                    presentOfficialChart(epoch);
-                } else if (event === 'TOKEN_REFRESHED') {
-                    scheduleCloudSave();
+                    enterSignedIn(session);
+                    return;
+                }
+                if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+                    authSession = null;
+                    lockSession();
+                    return;
+                }
+                if (event === 'TOKEN_REFRESHED') {
+                    refreshRealtimeAuth(session);
+                    if (orgData.length) scheduleCloudSave();
                 }
             });
 
             window.addEventListener('online', () => {
+                if (!authSession) return;
                 lastSyncError = '';
                 queueReconcile();
             });
-            window.addEventListener('offline', () => updateSyncStatus('offline'));
+            window.addEventListener('offline', () => {
+                if (authSession) updateSyncStatus('offline');
+            });
 
             try {
-                const { data } = await cloudClient.auth.getSession();
-                authSession = data && data.session ? data.session : null;
+                const { data, error } = await cloudClient.auth.getSession();
+                if (error || !data || !data.session || !data.session.user) authSession = null;
+                else authSession = data.session;
             } catch (error) {
                 console.error(error);
                 authSession = null;
             }
-            updateAuthUi();
             bootFinished = true;
-            subscribeRealtime();
-            await queueReconcile();
-            cloudReady = true;
-            if (editedDuringBoot && !choiceOpen) scheduleCloudSave();
+            if (authSession) enterSignedIn(authSession);
+            else lockSession();
         }
 
         // Viewport Transform State (Zoom & Pan)
@@ -1952,11 +2129,15 @@
 
         // Render All Nodes on Canvas
         function renderNodes() {
-            if (!container) return;
+            if (!container || !authSession || document.body.classList.contains('auth-locked')) return;
+            if (!orgData.length) {
+                showEmptyChartMessage();
+                return;
+            }
+            hideEmptyChartMessage();
             const firstPaint = !bootPainted;
             bootPainted = true;
-            const loading = document.getElementById('chartLoading');
-            if (loading) loading.remove();
+            setChartLoading(false);
             container.innerHTML = '';
             const editing = canEdit();
 
@@ -2394,7 +2575,7 @@
             nameInput.disabled = vacant;
             nameInput.classList.toggle('opacity-50', vacant);
             nameInput.classList.remove('border-red-500');
-            nameInput.placeholder = vacant ? 'Otomatis: nama jabatan + (Vacant)' : 'Contoh: Budi Setiawan';
+            nameInput.placeholder = vacant ? 'Otomatis: nama jabatan + (Vacant)' : 'Nama lengkap';
             if (!vacant && /\(vacant\)\s*$/i.test(nameInput.value)) nameInput.value = '';
         }
 
@@ -2905,24 +3086,18 @@
                 if (!userAdjustedView) fitChartToViewport();
             });
 
-            // Online: tunggu bagan cloud supaya salinan perangkat yang berbeda tidak sempat tampil.
-            // Offline: cache baca boleh langsung digambar, asal tidak diubah.
-            if (!navigator.onLine) {
-                hydrateOfficialMetaFromCache();
-                renderNodes();
-                updateLastUpdatedLabel();
-            }
+            // Bagan tidak digambar di sini. startCloudSync menunggu sesi; tanpa sesi gerbang tetap
+            // tampil dan cache lokal tidak dibaca.
             updateTransform();
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js').catch(() => { /* halaman tetap jalan tanpa cache offline */ });
             }
             startCloudSync().catch(error => {
                 console.error(error);
-                lastSyncError = 'Tidak dapat memuat bagan cloud. Menampilkan salinan di perangkat ini.';
-                if (!bootPainted) renderNodes();
                 bootFinished = true;
-                cloudReady = true;
-                updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+                showAuthGate();
+                const errEl = document.getElementById('loginError');
+                if (errEl && !errEl.textContent) errEl.textContent = 'Tidak terhubung ke server.';
             });
         }
 
