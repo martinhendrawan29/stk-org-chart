@@ -216,6 +216,31 @@
             background-color: #ffedd5;
         }
 
+        .node-name-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            max-width: 100%;
+            min-width: 0;
+            padding: 0 2px;
+        }
+        .node-name {
+            min-width: 0;
+        }
+        .node-emp {
+            flex: 0 0 auto;
+            font-size: 10px;
+            line-height: 1.2;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            font-variant-numeric: tabular-nums;
+        }
+        .node-bod .node-emp {
+            color: #94a3b8;
+        }
+
         /* Enhanced Clear Search Highlight Animation */
         .highlight-search {
             outline: 3px solid #6366f1 !important;
@@ -435,6 +460,14 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Lengkap</label>
                     <input type="text" id="modalName" required placeholder="Nama lengkap" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 capitalize">
+                </div>
+                <div id="modalEmpNoBlock">
+                    <label for="modalEmpNoOverride" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nomor Karyawan</label>
+                    <div class="flex items-center gap-2">
+                        <span id="modalEmpNoBadge" class="inline-flex items-center shrink-0 px-2.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-xs font-semibold tracking-wide tabular-nums">—</span>
+                        <input type="number" id="modalEmpNoOverride" min="1" step="1" inputmode="numeric" placeholder="Ubah (opsional)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <p id="modalEmpNoHint" class="mt-1 text-[10px] text-slate-400 leading-snug">Kosongkan untuk nomor otomatis. Nomor yang sudah terbit tidak dipakai ulang.</p>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Jabatan / Posisi</label>
@@ -675,12 +708,14 @@
                 const parent = node.parent == null || node.parent === '' ? '' : String(node.parent);
                 const x = Math.round((Number(node.x) || 0) * 100) / 100;
                 const y = Math.round((Number(node.y) || 0) * 100) / 100;
+                const emp = parseEmpNo(node.emp_no);
                 return [
                     node.id == null ? '' : String(node.id),
                     node.name == null ? '' : String(node.name),
                     node.title == null ? '' : String(node.title),
                     parent,
                     node.type == null ? '' : String(node.type),
+                    emp == null ? '' : String(emp),
                     x,
                     y
                 ].join('\u001f');
@@ -698,16 +733,204 @@
                 try { rows = JSON.parse(rows); } catch (e) { return null; }
             }
             if (!Array.isArray(rows)) return null;
-            return rows.filter(node => node && node.id != null).map(node => ({
-                ...node,
-                id: String(node.id),
-                name: node.name == null ? '' : String(node.name),
-                title: node.title == null ? '' : String(node.title),
-                parent: node.parent ? node.parent : null,
-                type: node.type || 'staff',
-                x: Number(node.x) || 0,
-                y: Number(node.y) || 0
-            }));
+            return rows.filter(node => node && node.id != null).map(node => {
+                const next = {
+                    ...node,
+                    id: String(node.id),
+                    name: node.name == null ? '' : String(node.name),
+                    title: node.title == null ? '' : String(node.title),
+                    parent: node.parent ? node.parent : null,
+                    type: node.type || 'staff',
+                    x: Number(node.x) || 0,
+                    y: Number(node.y) || 0
+                };
+                if (Object.prototype.hasOwnProperty.call(node, 'emp_no')) {
+                    const emp = parseEmpNo(node.emp_no);
+                    if (emp != null) next.emp_no = emp;
+                }
+                return next;
+            });
+        }
+
+        // Angka tertinggi yang pernah terbit. Tidak pernah diturunkan: hapus node tidak
+        // mengembalikan nomor, dan simpanan cloud tidak menulis last_emp_no di bawah nilai server.
+        let lastEmpNo = 0;
+        let serverLastEmpNo = null;
+        const provisionalEmpIds = new Set();
+        let provisionalReissued = false;
+        let ensureLastEmpPromise = null;
+
+        function parseEmpNo(value) {
+            if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value;
+            if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+                const n = Number(value.trim());
+                if (Number.isInteger(n) && n > 0 && n <= 2147483647) return n;
+            }
+            return null;
+        }
+
+        function formatEmpNo(value) {
+            const n = typeof value === 'number' ? value : parseEmpNo(value);
+            if (!Number.isInteger(n) || n <= 0) return '';
+            return 'STK-' + String(n).padStart(3, '0');
+        }
+
+        function isVacantNode(node) {
+            if (!node) return false;
+            if (node.type === 'vacant') return true;
+            return /\(vacant\)/i.test(String(node.name || ''));
+        }
+
+        function empNoVisible(node) {
+            if (!node || isVacantNode(node)) return '';
+            return formatEmpNo(node.emp_no);
+        }
+
+        function maxEmpNoIn(nodes) {
+            let max = 0;
+            if (!Array.isArray(nodes)) return 0;
+            nodes.forEach(node => {
+                const n = parseEmpNo(node && node.emp_no);
+                if (n != null && n > max) max = n;
+            });
+            return max;
+        }
+
+        function highWater(nodes) {
+            let max = lastEmpNo > 0 ? lastEmpNo : 0;
+            if (serverLastEmpNo != null && serverLastEmpNo > max) max = serverLastEmpNo;
+            const inNodes = maxEmpNoIn(nodes);
+            if (inNodes > max) max = inNodes;
+            return max;
+        }
+
+        function allocateEmpNo() {
+            const next = highWater(orgData) + 1;
+            lastEmpNo = next;
+            return next;
+        }
+
+        function noteChartEmpNos(nodes) {
+            const max = maxEmpNoIn(nodes);
+            if (max > lastEmpNo) lastEmpNo = max;
+        }
+
+        function noteServerLastEmpNo(value) {
+            if (value === undefined) return;
+            let n = 0;
+            if (value !== null && value !== '') {
+                if (typeof value === 'number' && Number.isInteger(value) && value >= 0) n = value;
+                else {
+                    const parsed = parseEmpNo(value);
+                    if (parsed == null) return;
+                    n = parsed;
+                }
+            }
+            serverLastEmpNo = serverLastEmpNo == null ? n : Math.max(serverLastEmpNo, n);
+            if (n > lastEmpNo) lastEmpNo = n;
+            if (reissueProvisional()) provisionalReissued = true;
+        }
+
+        function reissueProvisional() {
+            if (serverLastEmpNo == null || provisionalEmpIds.size === 0) return false;
+            const ids = Array.from(provisionalEmpIds);
+            provisionalEmpIds.clear();
+            let changed = false;
+            ids.forEach(id => {
+                const node = orgData.find(d => d.id === id);
+                if (!node || isVacantNode(node)) return;
+                const current = parseEmpNo(node.emp_no);
+                if (current != null && current > serverLastEmpNo) return;
+                node.emp_no = allocateEmpNo();
+                changed = true;
+            });
+            if (changed && bootPainted) renderNodes();
+            return changed;
+        }
+
+        async function ensureServerLastEmpNo() {
+            if (!cloudClient || !authSession) return false;
+            if (serverLastEmpNo == null) {
+                if (!ensureLastEmpPromise) {
+                    ensureLastEmpPromise = fetchCloudRow().catch(err => {
+                        console.error(err);
+                        return null;
+                    }).finally(() => {
+                        ensureLastEmpPromise = null;
+                    });
+                }
+                await ensureLastEmpPromise;
+            }
+            const changed = provisionalReissued;
+            provisionalReissued = false;
+            return changed;
+        }
+
+        // Nilai yang ditulis ke last_emp_no. null = kolom tidak ikut diubah (belum tahu nilai server,
+        // jadi jangan menimpanya dengan angka yang lebih kecil).
+        function lastEmpNoForWrite(nodes, inserting) {
+            const high = highWater(nodes);
+            if (serverLastEmpNo == null && !inserting) return null;
+            if (serverLastEmpNo != null && high < serverLastEmpNo) return serverLastEmpNo;
+            return high;
+        }
+
+        async function prepareSnapshotWrite(snapshot, inserting) {
+            const changed = await ensureServerLastEmpNo();
+            const data = changed ? JSON.parse(JSON.stringify(orgData)) : snapshot;
+            const payload = {
+                data: data,
+                updated_at: new Date().toISOString()
+            };
+            const high = lastEmpNoForWrite(data, !!inserting);
+            if (high != null) payload.last_emp_no = high;
+            return payload;
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function applyEmpNoChoice(node, choice) {
+            const isVacant = !!(choice && choice.isVacant);
+            const override = choice ? choice.override : null;
+            if (isVacant) {
+                provisionalEmpIds.delete(node.id);
+                return;
+            }
+            if (override != null) {
+                node.emp_no = override;
+                if (override > lastEmpNo) lastEmpNo = override;
+                provisionalEmpIds.delete(node.id);
+                return;
+            }
+            if (parseEmpNo(node.emp_no) != null) {
+                provisionalEmpIds.delete(node.id);
+                return;
+            }
+            if (choice && (choice.isNew || choice.wasVacant)) {
+                const provisional = serverLastEmpNo == null;
+                node.emp_no = allocateEmpNo();
+                if (provisional) provisionalEmpIds.add(node.id);
+            }
+        }
+
+        function readEmpNoOverride() {
+            const input = document.getElementById('modalEmpNoOverride');
+            if (!input || input.disabled) return { ok: true, value: null };
+            const raw = String(input.value || '').trim();
+            if (!raw) return { ok: true, value: null };
+            const n = parseEmpNo(raw);
+            if (n == null) return { ok: false };
+            return { ok: true, value: n };
+        }
+
+        function empNoTaken(n, selfId) {
+            return orgData.some(d => d.id !== selfId && parseEmpNo(d.emp_no) === n);
         }
 
         function decideInitialSync({
@@ -1228,7 +1451,7 @@
             const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
             let query = cloudClient
                 .from('org_chart_state')
-                .select('id, data, updated_at')
+                .select('id, data, updated_at, last_emp_no')
                 .eq('id', CHART_ID);
             if (controller) query = query.abortSignal(controller.signal);
             let data, error;
@@ -1247,20 +1470,20 @@
             if (!data) return null;
             const chart = coerceChart(data.data);
             if (!chart) throw new Error('Data bagan cloud tidak valid');
+            noteChartEmpNos(chart);
+            noteServerLastEmpNo(data.last_emp_no);
             noteOfficialChart(chart, data.updated_at);
-            return { id: data.id, data: chart, updated_at: data.updated_at };
+            return { id: data.id, data: chart, updated_at: data.updated_at, last_emp_no: data.last_emp_no };
         }
 
         async function writeSnapshot(snapshot, allowRetry) {
+            const payload = await prepareSnapshotWrite(snapshot, false);
             let query = cloudClient
                 .from('org_chart_state')
-                .update({
-                    data: snapshot,
-                    updated_at: new Date().toISOString()
-                })
+                .update(payload)
                 .eq('id', CHART_ID);
             if (cloudUpdatedAt) query = query.eq('updated_at', cloudUpdatedAt);
-            const { data, error } = await query.select('updated_at').maybeSingle();
+            const { data, error } = await query.select('updated_at, last_emp_no').maybeSingle();
             if (error) {
                 const msg = String(error.message || '').toLowerCase();
                 const code = String(error.code || '');
@@ -1269,17 +1492,21 @@
                 }
                 throw error;
             }
-            if (data && data.updated_at) return { ok: true, updated_at: data.updated_at };
+            if (data && data.updated_at) {
+                noteServerLastEmpNo(data.last_emp_no);
+                return { ok: true, updated_at: data.updated_at };
+            }
 
+            const written = payload.data;
             const fresh = await fetchCloudRow();
             if (!fresh) return { ok: false, reason: 'forbidden' };
             const freshFp = chartFingerprint(fresh.data);
-            const snapshotFp = chartFingerprint(snapshot);
+            const snapshotFp = chartFingerprint(written);
             if (freshFp === snapshotFp) return { ok: true, updated_at: fresh.updated_at, already: true };
             if (cloudFingerprint && freshFp === cloudFingerprint) {
                 if (allowRetry !== false && fresh.updated_at && fresh.updated_at !== cloudUpdatedAt) {
                     cloudUpdatedAt = fresh.updated_at;
-                    return writeSnapshot(snapshot, false);
+                    return writeSnapshot(written, false);
                 }
                 return { ok: false, reason: 'forbidden' };
             }
@@ -1318,6 +1545,7 @@
                 cloudSaveQueued = true;
                 return { ok: false, reason: 'queued' };
             }
+            await ensureServerLastEmpNo();
             const snapshot = JSON.parse(JSON.stringify(orgData));
             if (!Array.isArray(snapshot) || snapshot.length === 0) {
                 updateSyncStatus('empty');
@@ -1384,16 +1612,15 @@
         }
 
         async function insertSnapshot(snapshot) {
+            const payload = await prepareSnapshotWrite(snapshot, true);
+            payload.id = CHART_ID;
             const { data, error } = await cloudClient
                 .from('org_chart_state')
-                .insert({
-                    id: CHART_ID,
-                    data: snapshot,
-                    updated_at: new Date().toISOString()
-                })
-                .select('updated_at')
+                .insert(payload)
+                .select('updated_at, last_emp_no')
                 .maybeSingle();
             if (error || !data) return { ok: false, reason: 'forbidden', error };
+            noteServerLastEmpNo(data.last_emp_no);
             return { ok: true, updated_at: data.updated_at };
         }
 
@@ -1593,7 +1820,9 @@
 
         function handleRemoteRow(row) {
             if (!authSession) return;
+            if (row && Object.prototype.hasOwnProperty.call(row, 'last_emp_no')) noteServerLastEmpNo(row.last_emp_no);
             const data = coerceChart(row && row.data);
+            if (data) noteChartEmpNos(data);
             if (!data) return;
             if (data.length === 0) {
                 orgData = [];
@@ -2148,8 +2377,10 @@
                 node.className = `org-node ${classType} ${selectedNodeIds.has(item.id) ? 'multi-selected' : ''}`;
                 node.style.left = `${item.x}px`;
                 node.style.top = `${item.y}px`;
+                const empLabel = empNoVisible(item);
                 node.setAttribute('data-name', String(item.name || '').toLowerCase());
                 node.setAttribute('data-title', String(item.title || '').toLowerCase());
+                node.setAttribute('data-emp', empLabel.toLowerCase());
 
                 const safeId = String(item.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const actions = editing ? `
@@ -2162,8 +2393,11 @@
 
                 node.innerHTML = `
                     ${actions}
-                    <div class="font-bold text-xs truncate max-w-full px-1">${item.name || ''}</div>
-                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${item.title || ''}</div>
+                    <div class="node-name-row">
+                        <span class="node-name font-bold text-xs truncate">${escapeHtml(item.name || '')}</span>
+                        ${empLabel ? `<span class="node-emp" title="Nomor karyawan ${escapeHtml(empLabel)}">${escapeHtml(empLabel)}</span>` : ''}
+                    </div>
+                    <div class="text-[10px] opacity-80 node-title font-medium truncate max-w-full px-1">${escapeHtml(item.title || '')}</div>
                 `;
 
                 node.addEventListener('click', (e) => {
@@ -2551,9 +2785,48 @@
                 vacantCheckbox.checked = false;
             }
 
+            const empOverride = document.getElementById('modalEmpNoOverride');
+            if (empOverride) empOverride.value = '';
             syncVacantUi();
 
             modal.classList.remove('hidden');
+        }
+
+        function updateEmpNoForm() {
+            const badge = document.getElementById('modalEmpNoBadge');
+            const hint = document.getElementById('modalEmpNoHint');
+            const override = document.getElementById('modalEmpNoOverride');
+            const vacantInput = document.getElementById('modalIsVacant');
+            if (!badge || !hint || !override || !vacantInput) return;
+            const vacant = vacantInput.checked;
+            const id = document.getElementById('modalNodeId').value;
+            const item = id ? orgData.find(d => d.id === id) : null;
+            const existing = item ? parseEmpNo(item.emp_no) : null;
+            if (vacant) {
+                override.disabled = true;
+                if (existing) {
+                    badge.textContent = formatEmpNo(existing);
+                    hint.textContent = 'Tidak ditampilkan selama posisi kosong. Nomor tetap tersimpan dan tidak dipakai ulang.';
+                } else {
+                    badge.textContent = '—';
+                    hint.textContent = 'Posisi kosong tidak mendapat nomor karyawan.';
+                }
+                return;
+            }
+            override.disabled = false;
+            if (existing) {
+                badge.textContent = formatEmpNo(existing);
+                hint.textContent = 'Nomor ini tetap. Isi kolom di samping hanya jika perlu mengubahnya.';
+                return;
+            }
+            const willAssign = !id || (item && isVacantNode(item));
+            if (!willAssign) {
+                badge.textContent = '—';
+                hint.textContent = 'Belum ada nomor. Isi kolom untuk menetapkan. Kosongkan agar tetap tanpa nomor.';
+                return;
+            }
+            badge.textContent = formatEmpNo(highWater(orgData) + 1);
+            hint.textContent = 'Diberikan otomatis saat simpan. Isi kolom hanya untuk mengganti.';
         }
 
         // Ubah huruf jadi Title Case sambil menjaga posisi kursor
@@ -2577,6 +2850,7 @@
             nameInput.classList.remove('border-red-500');
             nameInput.placeholder = vacant ? 'Otomatis: nama jabatan + (Vacant)' : 'Nama lengkap';
             if (!vacant && /\(vacant\)\s*$/i.test(nameInput.value)) nameInput.value = '';
+            updateEmpNoForm();
         }
 
         // Cari x terdekat di level y yang tidak menimpa node lain (jarak minimal 20px).
@@ -2630,6 +2904,19 @@
             const type = isVacant ? 'vacant' : selectedLevel;
             const parent = document.getElementById('modalParentSelect').value || null;
             const targetY = getCenterYForLevel(selectedLevel);
+            const override = readEmpNoOverride();
+            if (!override.ok) {
+                showToast('Nomor karyawan harus bilangan bulat positif.');
+                const overrideInput = document.getElementById('modalEmpNoOverride');
+                if (overrideInput) overrideInput.focus();
+                return false;
+            }
+            if (!isVacant && override.value != null && empNoTaken(override.value, id || null)) {
+                showToast('Nomor karyawan itu sudah dipakai.');
+                const overrideInput = document.getElementById('modalEmpNoOverride');
+                if (overrideInput) overrideInput.focus();
+                return false;
+            }
 
             if (id) {
                 const item = orgData.find(d => d.id === id);
@@ -2638,11 +2925,13 @@
                     showToast('Atasan tidak valid: atasan tidak boleh bawahannya sendiri (akan membuat siklus).');
                     return false;
                 }
+                const wasVacant = isVacantNode(item);
                 saveStateToHistory();
                 item.name = name;
                 item.title = title;
                 item.parent = parent;
                 item.type = type;
+                applyEmpNoChoice(item, { isNew: false, wasVacant: wasVacant, isVacant: isVacant, override: override.value });
                 if (item.y !== targetY) {
                     // pindah level: x dipertahankan kalau kosong, kalau tidak digeser ke slot kosong terdekat
                     item.y = targetY;
@@ -2652,7 +2941,7 @@
                 saveStateToHistory();
                 const newId = 'node_' + Date.now();
                 const visibleCenterX = ((viewport ? viewport.clientWidth : 1200) / 2 - panX) / zoomScale - 105;
-                orgData.push({
+                const node = {
                     id: newId,
                     name: name,
                     title: title,
@@ -2660,7 +2949,9 @@
                     type: type,
                     x: findFreeX(newId, targetY, visibleCenterX),
                     y: targetY
-                });
+                };
+                applyEmpNoChoice(node, { isNew: true, wasVacant: false, isVacant: isVacant, override: override.value });
+                orgData.push(node);
             }
 
             closeModal();
@@ -2739,12 +3030,14 @@
 
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const safeTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const empLabel = empNoVisible(item);
 
                     nodesXml += `
                         <g>
                             <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1.5" ${item.type === 'vacant' ? 'stroke-dasharray="6 4"' : ''} />
                             ${accentBar}
                             <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="700" fill="${nameColor}">${safeName}</text>
+                            ${empLabel ? `<text x="${nx + 200}" y="${ny + 16}" text-anchor="end" font-family="sans-serif" font-size="8" font-weight="600" fill="#94a3b8">${empLabel}</text>` : ''}
                             <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="500" fill="${titleColor}">${safeTitle}</text>
                         </g>
                     `;
@@ -2844,9 +3137,10 @@
                 searchInput.addEventListener('input', (e) => {
                     const query = e.target.value.toLowerCase().trim();
                     document.querySelectorAll('.org-node').forEach(node => {
-                        const name = node.getAttribute('data-name');
-                        const title = node.getAttribute('data-title');
-                        if (query !== '' && (name.includes(query) || title.includes(query))) {
+                        const name = node.getAttribute('data-name') || '';
+                        const title = node.getAttribute('data-title') || '';
+                        const emp = node.getAttribute('data-emp') || '';
+                        if (query !== '' && (name.includes(query) || title.includes(query) || emp.includes(query))) {
                             node.classList.add('highlight-search');
                         } else {
                             node.classList.remove('highlight-search');
