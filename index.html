@@ -106,6 +106,7 @@
             text-align: center;
             cursor: move;
             z-index: 10;
+            --division-color: #111111;
             transition: border-color 0.15s, box-shadow 0.15s, transform 0.2s ease-in-out;
         }
 
@@ -115,6 +116,7 @@
             background-color: #0f172a !important;
         }
         body.auth-locked header,
+        body.auth-locked #divisionLegendBar,
         body.auth-locked #syncBanner,
         body.auth-locked #viewport,
         body.auth-locked #toast,
@@ -189,32 +191,30 @@
             50% { border-color: #059669; }
         }
 
-        /* Visual Department & Level Themes */
-        .node-ceo {
-            background: linear-gradient(135deg, #000000, #18181b);
+        /* CEO dan BOD tetap hitam. Kartu lain putih dengan aksen kiri warna divisi. */
+        .node-ceo,
+        .node-bod {
+            background: #111111;
             color: #ffffff;
             border-color: #27272a;
         }
-        .node-ceo .node-name { color: #ffffff; }
-        .node-ceo .node-title { color: #a1a1aa; opacity: 1; }
-        .node-ceo .node-emp { color: #a1a1aa; }
-
-        .node-bod {
-            background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
-            color: #ffffff;
-            border-color: #1e3a8a;
-        }
+        .node-ceo .node-name,
         .node-bod .node-name { color: #ffffff; }
-        .node-bod .node-title { color: #bfdbfe; opacity: 1; }
-        .node-bod .node-emp { color: #bfdbfe; }
+        .node-ceo .node-title,
+        .node-bod .node-title { color: #ffffff; opacity: 1; }
+        .node-ceo .node-emp,
+        .node-bod .node-emp { color: #ffffff; }
 
-        .node-head { border-left: 5px solid #b45309; }
-        .node-manager { border-left: 5px solid #7c3aed; }
-        .node-pm { border-left: 5px solid #f59e0b; }
-        .node-sm { border-left: 5px solid #10b981; }
-        .node-staff { border-left: 5px solid #3b82f6; }
-        .node-senior_staff { border-left: 5px solid #0891b2; }
-        .node-junior_staff { border-left: 5px solid #16a34a; }
+        .node-head,
+        .node-manager,
+        .node-pm,
+        .node-sm,
+        .node-staff,
+        .node-senior_staff,
+        .node-junior_staff {
+            background: #ffffff;
+            border-left: 5px solid var(--division-color, #111111);
+        }
 
         .node-vacant {
             border: 1.5px dashed #f59e0b !important;
@@ -226,6 +226,56 @@
         .node-vacant:hover {
             border-color: #ea580c !important;
             background-color: #ffedd5;
+        }
+        .division-mark {
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--division-color, #111111);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+        }
+
+        #divisionLegendBar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 6px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+            z-index: 30;
+        }
+        .division-legend-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+        #divisionLegend {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 12px;
+        }
+        .division-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #334155;
+            line-height: 1;
+        }
+        .division-chip i {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            display: inline-block;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.15);
         }
 
         .node-name-row {
@@ -415,6 +465,11 @@
         </div>
     </header>
 
+    <div id="divisionLegendBar">
+        <span class="division-legend-title">Divisi</span>
+        <div id="divisionLegend" aria-label="Divisi"></div>
+    </div>
+
     <div id="syncBanner" class="hidden bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
         <p id="syncBannerText" class="font-medium"></p>
         <div class="flex gap-2">
@@ -451,7 +506,7 @@
 
     <!-- EDIT / ADD NODE MODAL -->
     <div id="nodeModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md max-h-[92vh] overflow-y-auto">
             <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <h3 id="modalTitle" class="font-bold text-slate-800 text-sm">Edit Data Personil</h3>
                 <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600"><svg class="w-5 h-5 ic" aria-hidden="true"><use href="#i-x"/></svg></button>
@@ -500,6 +555,13 @@
                         <option value="senior_staff">Level Specialist</option>
                         <option value="junior_staff">Level Associate</option>
                     </select>
+                </div>
+                <div>
+                    <label for="modalDivisionSelect" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Divisi</label>
+                    <select id="modalDivisionSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="">Ikut atasan</option>
+                    </select>
+                    <p class="mt-1 text-[10px] text-slate-400 leading-snug">Ikut atasan mewarisi divisi cabang. Kartu CEO dan BOD tetap hitam.</p>
                 </div>
                 <div class="pt-2 flex justify-between items-center gap-2">
                     <button type="button" id="deleteNodeBtn" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
@@ -603,6 +665,66 @@
             { id: "junior_staff", name: "LEVEL ASSOCIATE", top: 1020, height: 200, centerY: 1090, bg: "rgba(255, 255, 255, 0.3)", labelBg: "#16a34a", labelColor: "#ffffff" }
         ];
 
+        // Warna divisi. division_override opsional mewarnai subtree sampai keturunan menimpanya.
+        // division dan color dihitung, lalu ditulis ke setiap node saat snapshot disimpan.
+        const DIVISIONS = [
+            { id: 'bod', label: 'BOD', color: '#111111' },
+            { id: 'operations', label: 'Operations', color: '#c2410c' },
+            { id: 'sales_marketing', label: 'Sales & Marketing', color: '#2563eb' },
+            { id: 'finance', label: 'Finance & Accounting', color: '#16a34a' },
+            { id: 'pnc', label: 'PNC', color: '#7c3aed' }
+        ];
+
+        function divisionRecord(key) {
+            if (typeof key !== 'string') return null;
+            for (let i = 0; i < DIVISIONS.length; i++) {
+                if (DIVISIONS[i].id === key) return DIVISIONS[i];
+            }
+            return null;
+        }
+
+        function isDivisionKey(key) {
+            return !!divisionRecord(key);
+        }
+
+        function divisionColor(key) {
+            const found = divisionRecord(key);
+            return found ? found.color : '#111111';
+        }
+
+        // ceo/bod selalu bod. Selain itu: override node, lalu override leluhur terdekat, kalau tidak ada maka bod.
+        function resolveNodeDivision(node, byId) {
+            if (!node) return 'bod';
+            if (node.type === 'ceo' || node.type === 'bod') return 'bod';
+            const seen = new Set();
+            let current = node;
+            while (current) {
+                if (seen.has(current)) return 'bod';
+                seen.add(current);
+                if (isDivisionKey(current.division_override)) return current.division_override;
+                if (current.parent == null || current.parent === '') return 'bod';
+                const parent = byId.get(String(current.parent));
+                if (!parent) return 'bod';
+                current = parent;
+            }
+            return 'bod';
+        }
+
+        function applyDivisionFields(nodes) {
+            if (!Array.isArray(nodes)) return nodes;
+            const byId = new Map();
+            nodes.forEach(node => {
+                if (node && node.id != null) byId.set(String(node.id), node);
+            });
+            nodes.forEach(node => {
+                if (!node || typeof node !== 'object') return;
+                const division = resolveNodeDivision(node, byId);
+                node.division = division;
+                node.color = divisionColor(division);
+            });
+            return nodes;
+        }
+
         // Bagan bawaan sengaja kosong. Nama dan jabatan hanya dimuat dari cloud setelah masuk.
         const defaultOrgData = [];
 
@@ -627,6 +749,7 @@
                 redoStack.push(JSON.stringify(orgData));
                 const previousState = historyStack.pop();
                 orgData = JSON.parse(previousState);
+                applyDivisionFields(orgData);
                 renderNodes();
                 autoSaveToLocalStorage();
             }
@@ -638,6 +761,7 @@
                 historyStack.push(JSON.stringify(orgData));
                 const nextState = redoStack.pop();
                 orgData = JSON.parse(nextState);
+                applyDivisionFields(orgData);
                 renderNodes();
                 autoSaveToLocalStorage();
             }
@@ -721,7 +845,7 @@
                 const x = Math.round((Number(node.x) || 0) * 100) / 100;
                 const y = Math.round((Number(node.y) || 0) * 100) / 100;
                 const emp = parseEmpNo(node.emp_no);
-                return [
+                const parts = [
                     node.id == null ? '' : String(node.id),
                     node.name == null ? '' : String(node.name),
                     node.title == null ? '' : String(node.title),
@@ -730,7 +854,11 @@
                     emp == null ? '' : String(emp),
                     x,
                     y
-                ].join('\u001f');
+                ];
+                if (node.division_override != null && String(node.division_override) !== '') {
+                    parts.push(String(node.division_override));
+                }
+                return parts.join('\u001f');
             }).sort().join('\u001e');
         }
 
@@ -890,6 +1018,7 @@
         async function prepareSnapshotWrite(snapshot, inserting) {
             const changed = await ensureServerLastEmpNo();
             const data = changed ? JSON.parse(JSON.stringify(orgData)) : snapshot;
+            applyDivisionFields(data);
             const payload = {
                 data: data,
                 updated_at: new Date().toISOString()
@@ -1110,6 +1239,7 @@
                 return;
             }
             orgData = JSON.parse(JSON.stringify(next));
+            applyDivisionFields(orgData);
             if (options && options.resetHistory) {
                 historyStack = [];
                 redoStack = [];
@@ -2314,6 +2444,7 @@
 
                 orgData = orgData.filter(d => d.id !== id);
                 selectedNodeIds.delete(id);
+                applyDivisionFields(orgData);
 
                 closeModal();
                 renderNodes();
@@ -2369,8 +2500,60 @@
             nodeEl.className = `org-node ${getNodeClassType(item)}${selectedNodeIds.has(item.id) ? ' multi-selected' : ''}`;
         }
 
+        function paintNodeDivision(nodeEl, item) {
+            if (!nodeEl || !item) return;
+            const color = item.color || divisionColor(item.division);
+            nodeEl.style.setProperty('--division-color', color);
+            nodeEl.setAttribute('data-division', item.division || 'bod');
+            nodeEl.setAttribute('data-color', color);
+        }
+
+        function renderDivisionLegend() {
+            const host = document.getElementById('divisionLegend');
+            if (!host) return;
+            host.innerHTML = '';
+            DIVISIONS.forEach(div => {
+                const chip = document.createElement('span');
+                chip.className = 'division-chip';
+                const swatch = document.createElement('i');
+                swatch.setAttribute('aria-hidden', 'true');
+                swatch.style.backgroundColor = div.color;
+                const label = document.createElement('span');
+                label.textContent = div.label;
+                chip.appendChild(swatch);
+                chip.appendChild(label);
+                host.appendChild(chip);
+            });
+        }
+
+        function populateDivisionSelect() {
+            const select = document.getElementById('modalDivisionSelect');
+            if (!select || select.dataset.ready === '1') return;
+            select.innerHTML = '<option value="">Ikut atasan</option>';
+            DIVISIONS.forEach(div => {
+                const opt = document.createElement('option');
+                opt.value = div.id;
+                opt.textContent = div.label;
+                select.appendChild(opt);
+            });
+            select.dataset.ready = '1';
+        }
+
+        function readDivisionOverride() {
+            const select = document.getElementById('modalDivisionSelect');
+            if (!select) return undefined;
+            return isDivisionKey(select.value) ? select.value : '';
+        }
+
+        function assignDivisionOverride(node, choice) {
+            if (!node || choice === undefined) return;
+            if (choice) node.division_override = choice;
+            else delete node.division_override;
+        }
+
         // Render All Nodes on Canvas
         function renderNodes() {
+            applyDivisionFields(orgData);
             if (!container || !authSession || document.body.classList.contains('auth-locked')) return;
             if (!orgData.length) {
                 showEmptyChartMessage();
@@ -2394,6 +2577,7 @@
                 node.setAttribute('data-name', String(item.name || '').toLowerCase());
                 node.setAttribute('data-title', String(item.title || '').toLowerCase());
                 node.setAttribute('data-emp', empLabel.toLowerCase());
+                paintNodeDivision(node, item);
 
                 const safeId = String(item.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const actions = editing ? `
@@ -2404,8 +2588,10 @@
                     </div>
                 ` : '';
 
+                const vacantMark = item.type === 'vacant' ? '<span class="division-mark" aria-hidden="true"></span>' : '';
                 node.innerHTML = `
                     ${actions}
+                    ${vacantMark}
                     <div class="node-name-row">
                         <span class="node-name font-bold text-xs truncate">${escapeHtml(item.name || '')}</span>
                         ${empLabel ? `<span class="node-emp" title="Nomor karyawan ${escapeHtml(empLabel)}">${escapeHtml(empLabel)}</span>` : ''}
@@ -2614,6 +2800,14 @@
                         }
                     });
 
+                    applyDivisionFields(orgData);
+                    orgData.forEach(item => {
+                        const nodeEl = document.getElementById(`node-${item.id}`);
+                        if (!nodeEl) return;
+                        if (selectedNodeIds.has(item.id)) applyNodeClasses(nodeEl, item);
+                        paintNodeDivision(nodeEl, item);
+                    });
+
                     updateConnectors();
                     autoSaveToLocalStorage();
                     chartInteraction = Math.max(0, chartInteraction - 1);
@@ -2678,6 +2872,7 @@
                 saveStateToHistory();
                 const childObj = orgData.find(d => d.id === connectChildId);
                 childObj.parent = nodeId;
+                applyDivisionFields(orgData);
 
                 toggleConnectMode();
                 renderNodes();
@@ -2800,6 +2995,16 @@
 
             const empOverride = document.getElementById('modalEmpNoOverride');
             if (empOverride) empOverride.value = '';
+            populateDivisionSelect();
+            const divisionSelect = document.getElementById('modalDivisionSelect');
+            if (divisionSelect) {
+                let divisionKey = '';
+                if (nodeId) {
+                    const current = orgData.find(d => d.id === nodeId);
+                    if (current && isDivisionKey(current.division_override)) divisionKey = current.division_override;
+                }
+                divisionSelect.value = divisionKey;
+            }
             syncVacantUi();
 
             modal.classList.remove('hidden');
@@ -2916,6 +3121,7 @@
             const selectedLevel = document.getElementById('modalTypeSelect').value;
             const type = isVacant ? 'vacant' : selectedLevel;
             const parent = document.getElementById('modalParentSelect').value || null;
+            const divisionChoice = readDivisionOverride();
             const targetY = getCenterYForLevel(selectedLevel);
             const override = readEmpNoOverride();
             if (!override.ok) {
@@ -2944,6 +3150,7 @@
                 item.title = title;
                 item.parent = parent;
                 item.type = type;
+                assignDivisionOverride(item, divisionChoice);
                 applyEmpNoChoice(item, { isNew: false, wasVacant: wasVacant, isVacant: isVacant, override: override.value });
                 if (item.y !== targetY) {
                     // pindah level: x dipertahankan kalau kosong, kalau tidak digeser ke slot kosong terdekat
@@ -2963,11 +3170,13 @@
                     x: findFreeX(newId, targetY, visibleCenterX),
                     y: targetY
                 };
+                assignDivisionOverride(node, divisionChoice);
                 applyEmpNoChoice(node, { isNew: true, wasVacant: false, isVacant: isVacant, override: override.value });
                 orgData.push(node);
             }
 
             closeModal();
+            applyDivisionFields(orgData);
             renderNodes();
             autoSaveToLocalStorage();
             return true;
@@ -2978,145 +3187,177 @@
             if (modal) modal.classList.add('hidden');
         }
 
-        // Card paint for SVG/PNG export. Unknown types fall back to the nearest band.
-        function exportAppearanceForLevel(levelId) {
-            if (levelId === 'ceo') {
+        function visualLevelId(item) {
+            if (!item) return 'junior_staff';
+            if (item.type === 'ceo' || item.type === 'bod' || item.type === 'head' || item.type === 'manager' || item.type === 'senior_staff' || item.type === 'junior_staff') {
+                return item.type;
+            }
+            if (item.type === 'vacant') return 'vacant';
+            const zone = snapToNearestLevelY(item.y);
+            return zone ? zone.id : 'junior_staff';
+        }
+
+        function divisionLegendSvg(x, y) {
+            const fontSize = 12;
+            const charW = 7.2;
+            const dot = 5;
+            const dotGap = 6;
+            const chipGap = 16;
+            const padX = 12;
+            const height = 34;
+            let cursor = x + padX;
+            const pieces = [{ kind: 'title', text: 'DIVISI', x: cursor, w: 'DIVISI'.length * charW }];
+            cursor += pieces[0].w + chipGap;
+            DIVISIONS.forEach(div => {
+                const textW = Math.ceil(div.label.length * charW);
+                pieces.push({ kind: 'chip', div: div, x: cursor, textW: textW });
+                cursor += dot * 2 + dotGap + textW + chipGap;
+            });
+            const width = Math.ceil((cursor - chipGap + padX) - x);
+            const cy = y + height / 2 + 0.5;
+            let markup = '<g id="divisionLegendExport">';
+            markup += `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>`;
+            pieces.forEach(piece => {
+                if (piece.kind === 'title') {
+                    markup += `<text x="${piece.x}" y="${cy + 4}" font-family="sans-serif" font-size="10" font-weight="700" fill="#94a3b8">${escapeHtml(piece.text)}</text>`;
+                    return;
+                }
+                const cx = piece.x + dot;
+                markup += `<circle cx="${cx}" cy="${cy}" r="${dot}" fill="${piece.div.color}"/>`;
+                markup += `<text x="${cx + dot + dotGap}" y="${cy + 4}" font-family="sans-serif" font-size="${fontSize}" font-weight="600" fill="#334155">${escapeHtml(piece.div.label)}</text>`;
+            });
+            markup += '</g>';
+            return { markup: markup, width: width, height: height };
+        }
+
+        // Kartu ekspor memakai warna divisi yang sama dengan kanvas. CEO/BOD tetap hitam.
+        function exportAppearanceForNode(item) {
+            const color = (item && item.color) || divisionColor(item && item.division);
+            if (item && item.type === 'vacant') {
                 return {
-                    bgFill: 'url(#ceoCardFill)',
+                    bgFill: '#fffbe8',
+                    strokeColor: '#f59e0b',
+                    nameColor: '#1e293b',
+                    titleColor: '#64748b',
+                    empColor: '#94a3b8',
+                    accent: '',
+                    dot: color,
+                    dashed: true
+                };
+            }
+            const levelId = visualLevelId(item);
+            if (levelId === 'ceo' || levelId === 'bod') {
+                return {
+                    bgFill: '#111111',
                     strokeColor: '#27272a',
                     nameColor: '#ffffff',
-                    titleColor: '#a1a1aa',
-                    empColor: '#a1a1aa',
-                    accent: ''
+                    titleColor: '#ffffff',
+                    empColor: '#ffffff',
+                    accent: '',
+                    dot: '',
+                    dashed: false
                 };
             }
-            if (levelId === 'bod') {
-                return {
-                    bgFill: 'url(#bodCardFill)',
-                    strokeColor: '#1e3a8a',
-                    nameColor: '#ffffff',
-                    titleColor: '#bfdbfe',
-                    empColor: '#bfdbfe',
-                    accent: ''
-                };
-            }
-            const accents = {
-                head: '#b45309',
-                manager: '#7c3aed',
-                senior_staff: '#0891b2',
-                junior_staff: '#16a34a'
-            };
-            if (!accents[levelId]) return null;
             return {
                 bgFill: '#ffffff',
                 strokeColor: '#cbd5e1',
                 nameColor: '#1e293b',
                 titleColor: '#64748b',
                 empColor: '#94a3b8',
-                accent: accents[levelId]
+                accent: color,
+                dot: '',
+                dashed: false
             };
+        }
+
+        function buildChartExportSvg() {
+            applyDivisionFields(orgData);
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            orgData.forEach(node => {
+                if (node.x < minX) minX = node.x;
+                if (node.y < minY) minY = node.y;
+                if (node.x + 210 > maxX) maxX = node.x + 210;
+                if (node.y + 64 > maxY) maxY = node.y + 64;
+            });
+
+            const legendProbe = divisionLegendSvg(0, 0);
+            const leftMargin = 220;
+            const padding = 60;
+            const startX = Math.max(0, minX - padding) - leftMargin;
+            const startY = Math.max(0, minY - padding);
+            let exportWidth = (maxX - minX) + (padding * 2) + leftMargin;
+            const chartHeight = (maxY - minY) + (padding * 2);
+            const legendX = 20;
+            if (exportWidth < legendX + legendProbe.width + 20) exportWidth = legendX + legendProbe.width + 20;
+
+            let contentBottom = chartHeight;
+            let swimlanesXml = '';
+            LEVEL_ZONES.forEach(zone => {
+                const zTop = zone.top - startY;
+                if (zTop + zone.height > 0 && zTop < chartHeight) {
+                    contentBottom = Math.max(contentBottom, zTop + zone.height);
+                    swimlanesXml += `
+                        <rect x="0" y="${zTop}" width="${exportWidth}" height="${zone.height}" fill="${zone.bg}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4" />
+                        <rect x="20" y="${zTop + 10}" width="180" height="26" rx="6" fill="${zone.labelBg}" />
+                        <text x="30" y="${zTop + 27}" font-family="sans-serif" font-size="11" font-weight="700" fill="${zone.labelColor}">${zone.name}</text>
+                    `;
+                }
+            });
+
+            const legend = divisionLegendSvg(legendX, contentBottom + 14);
+            const exportHeight = contentBottom + 14 + legend.height + 16;
+            const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport');
+
+            let nodesXml = '';
+            orgData.forEach(item => {
+                const nx = item.x - startX;
+                const ny = item.y - startY;
+                const appearance = exportAppearanceForNode(item);
+                let accentBar = '';
+                if (appearance.accent) {
+                    accentBar += `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="${appearance.accent}" />`;
+                }
+                if (appearance.dot) {
+                    accentBar += `<circle cx="${nx + 14}" cy="${ny + 14}" r="4" fill="${appearance.dot}" />`;
+                }
+
+                const safeName = String(item.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeTitle = String(item.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const empLabel = empNoVisible(item);
+
+                nodesXml += `
+                    <g>
+                        <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${appearance.bgFill}" stroke="${appearance.strokeColor}" stroke-width="1.5" ${appearance.dashed ? 'stroke-dasharray="6 4"' : ''} />
+                        ${accentBar}
+                        <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="700" fill="${appearance.nameColor}">${safeName}</text>
+                        ${empLabel ? `<text x="${nx + 200}" y="${ny + 16}" text-anchor="end" font-family="sans-serif" font-size="8" font-weight="600" fill="${appearance.empColor}">${empLabel}</text>` : ''}
+                        <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="500" fill="${appearance.titleColor}">${safeTitle}</text>
+                    </g>
+                `;
+            });
+
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">
+                <defs>
+                    <marker id="arrowExport" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+                    </marker>
+                </defs>
+                <rect width="100%" height="100%" fill="#f8fafc" />
+                ${swimlanesXml}
+                ${pathsSvg}
+                ${nodesXml}
+                ${legend.markup}
+            </svg>`;
+            return { svg: svg, width: exportWidth, height: exportHeight };
         }
 
         // High-Resolution Export
         function exportChartToPng() {
             try {
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                orgData.forEach(node => {
-                    if (node.x < minX) minX = node.x;
-                    if (node.y < minY) minY = node.y;
-                    if (node.x + 210 > maxX) maxX = node.x + 210;
-                    if (node.y + 64 > maxY) maxY = node.y + 64;
-                });
-
-                const leftMargin = 220;
-                const padding = 60;
-                const startX = Math.max(0, minX - padding) - leftMargin;
-                const startY = Math.max(0, minY - padding);
-                const exportWidth = (maxX - minX) + (padding * 2) + leftMargin;
-                const exportHeight = (maxY - minY) + (padding * 2);
-
-                let swimlanesXml = '';
-                LEVEL_ZONES.forEach(zone => {
-                    const zTop = zone.top - startY;
-                    if (zTop + zone.height > 0 && zTop < exportHeight) {
-                        swimlanesXml += `
-                            <rect x="0" y="${zTop}" width="${exportWidth}" height="${zone.height}" fill="${zone.bg}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4" />
-                            <rect x="20" y="${zTop + 10}" width="180" height="26" rx="6" fill="${zone.labelBg}" />
-                            <text x="30" y="${zTop + 27}" font-family="sans-serif" font-size="11" font-weight="700" fill="${zone.labelColor}">${zone.name}</text>
-                        `;
-                    }
-                });
-
-                const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport');
-
-                let nodesXml = '';
-                orgData.forEach(item => {
-                    const nx = item.x - startX;
-                    const ny = item.y - startY;
-
-                    let bgFill = "#ffffff";
-                    let strokeColor = "#cbd5e1";
-                    let nameColor = "#1e293b";
-                    let titleColor = "#64748b";
-                    let empColor = "#94a3b8";
-                    let accentBar = "";
-
-                    if (item.type === 'vacant') {
-                        bgFill = "#fffbe8";
-                        strokeColor = "#f59e0b";
-                    } else {
-                        let appearance = exportAppearanceForLevel(item.type);
-                        if (!appearance) {
-                            const levelZone = snapToNearestLevelY(item.y);
-                            appearance = exportAppearanceForLevel(levelZone.id);
-                        }
-                        if (appearance) {
-                            bgFill = appearance.bgFill;
-                            strokeColor = appearance.strokeColor;
-                            nameColor = appearance.nameColor;
-                            titleColor = appearance.titleColor;
-                            empColor = appearance.empColor;
-                            if (appearance.accent) {
-                                accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="${appearance.accent}" />`;
-                            }
-                        }
-                    }
-
-                    const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const safeTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const empLabel = empNoVisible(item);
-
-                    nodesXml += `
-                        <g>
-                            <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1.5" ${item.type === 'vacant' ? 'stroke-dasharray="6 4"' : ''} />
-                            ${accentBar}
-                            <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="700" fill="${nameColor}">${safeName}</text>
-                            ${empLabel ? `<text x="${nx + 200}" y="${ny + 16}" text-anchor="end" font-family="sans-serif" font-size="8" font-weight="600" fill="${empColor}">${empLabel}</text>` : ''}
-                            <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="500" fill="${titleColor}">${safeTitle}</text>
-                        </g>
-                    `;
-                });
-
-                const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">
-                    <defs>
-                        <linearGradient id="ceoCardFill" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stop-color="#000000" />
-                            <stop offset="100%" stop-color="#18181b" />
-                        </linearGradient>
-                        <linearGradient id="bodCardFill" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stop-color="#1e3a8a" />
-                            <stop offset="100%" stop-color="#1d4ed8" />
-                        </linearGradient>
-                        <marker id="arrowExport" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
-                        </marker>
-                    </defs>
-                    <rect width="100%" height="100%" fill="#f8fafc" />
-                    ${swimlanesXml}
-                    ${pathsSvg}
-                    ${nodesXml}
-                </svg>`;
-
+                const built = buildChartExportSvg();
+                const svgString = built.svg;
+                const exportWidth = built.width;
+                const exportHeight = built.height;
                 const encodedSvg = encodeURIComponent(svgString);
                 const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodedSvg;
                 const img = new Image();
@@ -3158,6 +3399,8 @@
 
         // Initialize App & Event Listeners
         function initApp() {
+            renderDivisionLegend();
+            populateDivisionSelect();
             viewport = document.getElementById('viewport');
             transformer = document.getElementById('chartTransformer');
             container = document.getElementById('nodesContainer');
