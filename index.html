@@ -887,9 +887,48 @@
             return high;
         }
 
+        // Warna pita level yang ditulis ke setiap node saat snapshot disimpan.
+        const LEVEL_COLORS = {
+            ceo: '#000000',
+            bod: '#1d4ed8',
+            head: '#b45309',
+            manager: '#7c3aed',
+            senior_staff: '#0891b2',
+            junior_staff: '#16a34a'
+        };
+
+        function levelColorForNode(node) {
+            const type = node && node.type;
+            if (type && type !== 'vacant' && Object.prototype.hasOwnProperty.call(LEVEL_COLORS, type)) {
+                return LEVEL_COLORS[type];
+            }
+            const y = Number(node && node.y);
+            const levelId = getLevelTypeFromY(Number.isFinite(y) ? y : 0);
+            return LEVEL_COLORS[levelId];
+        }
+
+        // Salinan untuk disimpan: color sesuai level, x/y tetap angka,
+        // division dan division_override dibuang. Field lain tidak diubah.
+        function stampLevelColors(nodes) {
+            if (!Array.isArray(nodes)) return nodes;
+            return nodes.map(node => {
+                if (!node || typeof node !== 'object') return node;
+                const next = { ...node };
+                delete next.division;
+                delete next.division_override;
+                const x = Number(node.x);
+                const y = Number(node.y);
+                next.x = Number.isFinite(x) ? x : 0;
+                next.y = Number.isFinite(y) ? y : 0;
+                next.color = levelColorForNode(next);
+                return next;
+            });
+        }
+
         async function prepareSnapshotWrite(snapshot, inserting) {
             const changed = await ensureServerLastEmpNo();
-            const data = changed ? JSON.parse(JSON.stringify(orgData)) : snapshot;
+            const source = changed ? JSON.parse(JSON.stringify(orgData)) : snapshot;
+            const data = stampLevelColors(source);
             const payload = {
                 data: data,
                 updated_at: new Date().toISOString()
