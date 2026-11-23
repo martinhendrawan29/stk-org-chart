@@ -284,6 +284,26 @@
             display: flex;
         }
 
+        /* Titik penanda. Hanya untuk editor yang sedang masuk. Tidak ikut cetak. */
+        .node-mark {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #2563eb;
+            pointer-events: none;
+        }
+        body:not(.can-edit) .node-mark {
+            display: none !important;
+        }
+        @media print {
+            .node-mark {
+                display: none !important;
+            }
+        }
+
         /* Icon inline (SVG sprite di dalam file ini), tidak bergantung pada library CDN */
         .ic {
             fill: none;
@@ -502,6 +522,10 @@
                         <option value="senior_staff">Level Specialist</option>
                         <option value="junior_staff">Level Associate</option>
                     </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="modalMarked" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                    <label for="modalMarked" class="text-xs font-semibold text-slate-700 cursor-pointer">Beri penanda</label>
                 </div>
                 <div class="pt-2 flex justify-between items-center gap-2">
                     <button type="button" id="deleteNodeBtn" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
@@ -736,7 +760,7 @@
                 const x = Math.round((Number(node.x) || 0) * 100) / 100;
                 const y = Math.round((Number(node.y) || 0) * 100) / 100;
                 const emp = parseEmpNo(node.emp_no);
-                return [
+                const parts = [
                     node.id == null ? '' : String(node.id),
                     node.name == null ? '' : String(node.name),
                     node.title == null ? '' : String(node.title),
@@ -745,7 +769,10 @@
                     emp == null ? '' : String(emp),
                     x,
                     y
-                ].join('\u001f');
+                ];
+                // Hanya penanda yang aktif mengubah sidik jari, supaya simpanan cloud ikut terkirim.
+                if (node.marked === true) parts.push('marked');
+                return parts.join('\u001f');
             }).sort().join('\u001e');
         }
 
@@ -775,6 +802,7 @@
                     const emp = parseEmpNo(node.emp_no);
                     if (emp != null) next.emp_no = emp;
                 }
+                if (next.marked !== true) delete next.marked;
                 return next;
             });
         }
@@ -2501,9 +2529,11 @@
                         </button>
                     </div>
                 ` : '';
+                const mark = editing && item.marked === true ? '<span class="node-mark" aria-hidden="true"></span>' : '';
 
                 node.innerHTML = `
                     ${actions}
+                    ${mark}
                     <div class="node-name-row">
                         <span class="node-name font-bold text-xs truncate">${escapeHtml(item.name || '')}</span>
                         ${empLabel ? `<span class="node-emp" title="Nomor karyawan ${escapeHtml(empLabel)}">${escapeHtml(empLabel)}</span>` : ''}
@@ -2532,13 +2562,14 @@
         }
 
         // Generate Clean Unified Tree Bus Connectors
-        function generateConnectorsSvgString(offsetX = 0, offsetY = 0, markerId = 'arrow') {
+        function generateConnectorsSvgString(offsetX = 0, offsetY = 0, markerId = 'arrow', nodes) {
+            const data = Array.isArray(nodes) ? nodes : orgData;
             let pathsSvg = '';
             const nodeMap = {};
-            orgData.forEach(d => nodeMap[d.id] = d);
+            data.forEach(d => nodeMap[d.id] = d);
 
             const childrenByParent = {};
-            orgData.forEach(item => {
+            data.forEach(item => {
                 if (item.parent && nodeMap[item.parent]) {
                     if (!childrenByParent[item.parent]) {
                         childrenByParent[item.parent] = [];
@@ -2870,6 +2901,7 @@
                 }
             });
 
+            const markedCheckbox = document.getElementById('modalMarked');
             if (nodeId) {
                 const item = orgData.find(d => d.id === nodeId);
                 document.getElementById('modalTitle').innerText = 'Edit Data Personil';
@@ -2885,6 +2917,7 @@
                 } else {
                     vacantCheckbox.checked = false;
                 }
+                if (markedCheckbox) markedCheckbox.checked = item.marked === true;
             } else {
                 document.getElementById('modalTitle').innerText = 'Tambah Personil Baru';
                 document.getElementById('modalNodeId').value = '';
@@ -2894,6 +2927,7 @@
                 document.getElementById('modalTypeSelect').value = 'junior_staff';
                 document.getElementById('deleteNodeBtn').classList.add('hidden');
                 vacantCheckbox.checked = false;
+                if (markedCheckbox) markedCheckbox.checked = false;
             }
 
             const empOverride = document.getElementById('modalEmpNoOverride');
@@ -3078,6 +3112,7 @@
             }
             clearEmpNoError();
 
+            const markedInput = document.getElementById('modalMarked');
             return {
                 id: id,
                 name: name,
@@ -3086,8 +3121,14 @@
                 type: type,
                 isVacant: isVacant,
                 targetY: targetY,
-                override: override.value
+                override: override.value,
+                marked: !!(markedInput && markedInput.checked)
             };
+        }
+
+        function applyMarkedFlag(node, marked) {
+            if (marked) node.marked = true;
+            else delete node.marked;
         }
 
         function commitNodeSave(fields, renew) {
@@ -3116,6 +3157,7 @@
                     override: overrideValue,
                     renew: !!renew && !wasVacant
                 });
+                applyMarkedFlag(item, fields.marked);
                 if (item.y !== targetY) {
                     // pindah level: x dipertahankan kalau kosong, kalau tidak digeser ke slot kosong terdekat
                     item.y = targetY;
@@ -3134,6 +3176,7 @@
                     x: findFreeX(newId, targetY, visibleCenterX),
                     y: targetY
                 };
+                applyMarkedFlag(node, fields.marked);
                 applyEmpNoChoice(node, { isNew: true, wasVacant: false, isVacant: isVacant, override: overrideValue });
                 orgData.push(node);
             }
@@ -3212,11 +3255,167 @@
             };
         }
 
+        // Level pita untuk satu node. Tipe yang dikenal menang; selain itu pita terdekat dari y.
+        function shareLevelId(node) {
+            if (node && LEVEL_ZONES.some(zone => zone.id === node.type)) return node.type;
+            return snapToNearestLevelY(Number(node && node.y) || 0).id;
+        }
+
+        // Salinan untuk unduhan Export PNG (berkas yang dibagikan ke staf).
+        // Posisi kosong (type vacant) tidak ikut. Anaknya naik ke atasan terdekat yang masih ada,
+        // lalu tata letak dirapatkan. Orang dengan penanda tetap ikut; titik penanda tidak digambar.
+        // Bagan di layar dan data tersimpan tidak diubah.
+        function buildShareExport(source) {
+            const all = Array.isArray(source) ? source.map(node => ({ ...node })) : [];
+            const byId = new Map(all.map(node => [String(node.id), node]));
+            const excluded = new Set(all.filter(node => node && node.type === 'vacant').map(node => String(node.id)));
+            const visible = all.filter(node => node && !excluded.has(String(node.id)));
+
+            function nearestVisibleParentId(node) {
+                let parentId = node.parent;
+                const seen = new Set();
+                while (parentId != null && parentId !== '' && !seen.has(String(parentId))) {
+                    seen.add(String(parentId));
+                    if (!excluded.has(String(parentId)) && byId.has(String(parentId))) {
+                        return byId.get(String(parentId)).id;
+                    }
+                    const parent = byId.get(String(parentId));
+                    parentId = parent ? parent.parent : null;
+                }
+                return null;
+            }
+
+            if (excluded.size === 0) {
+                return { nodes: visible, zones: LEVEL_ZONES };
+            }
+
+            visible.forEach(node => {
+                node.parent = nearestVisibleParentId(node);
+            });
+
+            const levelOf = new Map(visible.map(node => [String(node.id), shareLevelId(node)]));
+            const children = new Map();
+            visible.forEach(node => {
+                const key = node.parent == null || node.parent === '' ? '' : String(node.parent);
+                if (!children.has(key)) children.set(key, []);
+                children.get(key).push(node);
+            });
+            children.forEach(list => {
+                list.sort((a, b) => (Number(a.x) - Number(b.x)) || String(a.id).localeCompare(String(b.id)));
+            });
+
+            const NODE_W = 210;
+            const GAP = 20;
+            const roots = children.get('') || [];
+            const subWidth = new Map();
+
+            function measure(node, seen) {
+                const id = String(node.id);
+                if (seen.has(id)) return NODE_W;
+                seen.add(id);
+                const kids = children.get(id) || [];
+                if (!kids.length) {
+                    subWidth.set(id, NODE_W);
+                    return NODE_W;
+                }
+                let total = 0;
+                kids.forEach((kid, index) => {
+                    if (index) total += GAP;
+                    total += measure(kid, seen);
+                });
+                const width = Math.max(NODE_W, total);
+                subWidth.set(id, width);
+                return width;
+            }
+
+            function place(node, left, seen) {
+                const id = String(node.id);
+                if (seen.has(id)) return;
+                seen.add(id);
+                const width = subWidth.get(id) || NODE_W;
+                const kids = children.get(id) || [];
+                node.x = left + (width - NODE_W) / 2;
+                if (!kids.length) return;
+                let kidsWidth = 0;
+                kids.forEach((kid, index) => {
+                    if (index) kidsWidth += GAP;
+                    kidsWidth += subWidth.get(String(kid.id)) || NODE_W;
+                });
+                let cursor = left + (width - kidsWidth) / 2;
+                kids.forEach(kid => {
+                    place(kid, cursor, seen);
+                    cursor += (subWidth.get(String(kid.id)) || NODE_W) + GAP;
+                });
+            }
+
+            const measureSeen = new Set();
+            roots.forEach(root => measure(root, measureSeen));
+            visible.forEach(node => {
+                if (!measureSeen.has(String(node.id))) measure(node, measureSeen);
+            });
+            let cursor = 0;
+            const placeSeen = new Set();
+            roots.forEach(root => {
+                place(root, cursor, placeSeen);
+                cursor += (subWidth.get(String(root.id)) || NODE_W) + GAP;
+            });
+            visible.forEach(node => {
+                if (placeSeen.has(String(node.id))) return;
+                place(node, cursor, placeSeen);
+                cursor += (subWidth.get(String(node.id)) || NODE_W) + GAP;
+            });
+
+            // Satu pita tidak boleh menumpuk dua kartu, termasuk atasan dan bawahan yang selevel.
+            const byLevel = new Map();
+            visible.forEach(node => {
+                const level = levelOf.get(String(node.id));
+                if (!byLevel.has(level)) byLevel.set(level, []);
+                byLevel.get(level).push(node);
+            });
+            byLevel.forEach(list => {
+                list.sort((a, b) => (Number(a.x) - Number(b.x)) || String(a.id).localeCompare(String(b.id)));
+                let nextX = -Infinity;
+                list.forEach(node => {
+                    if (node.x < nextX) node.x = nextX;
+                    nextX = node.x + NODE_W + GAP;
+                });
+            });
+
+            const used = new Set(levelOf.values());
+            let shift = 0;
+            const zones = [];
+            LEVEL_ZONES.forEach(zone => {
+                if (!used.has(zone.id)) {
+                    shift += zone.height;
+                    return;
+                }
+                zones.push({
+                    ...zone,
+                    top: zone.top - shift,
+                    centerY: zone.centerY - shift
+                });
+            });
+            const zoneById = new Map(zones.map(zone => [zone.id, zone]));
+            visible.forEach(node => {
+                const zone = zoneById.get(levelOf.get(String(node.id)));
+                if (zone) node.y = zone.centerY;
+            });
+            return { nodes: visible, zones: zones.length ? zones : LEVEL_ZONES };
+        }
+
         // High-Resolution Export
         function exportChartToPng() {
             try {
+                const share = buildShareExport(orgData);
+                const exportNodes = share.nodes;
+                const exportZones = share.zones;
+                if (!exportNodes.length) {
+                    showToast('Tidak ada kotak untuk diunduh.');
+                    return;
+                }
+
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                orgData.forEach(node => {
+                exportNodes.forEach(node => {
                     if (node.x < minX) minX = node.x;
                     if (node.y < minY) minY = node.y;
                     if (node.x + 210 > maxX) maxX = node.x + 210;
@@ -3231,7 +3430,7 @@
                 const exportHeight = (maxY - minY) + (padding * 2);
 
                 let swimlanesXml = '';
-                LEVEL_ZONES.forEach(zone => {
+                exportZones.forEach(zone => {
                     const zTop = zone.top - startY;
                     if (zTop + zone.height > 0 && zTop < exportHeight) {
                         swimlanesXml += `
@@ -3242,10 +3441,10 @@
                     }
                 });
 
-                const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport');
+                const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport', exportNodes);
 
                 let nodesXml = '';
-                orgData.forEach(item => {
+                exportNodes.forEach(item => {
                     const nx = item.x - startX;
                     const ny = item.y - startY;
 
@@ -3262,8 +3461,16 @@
                     } else {
                         let appearance = exportAppearanceForLevel(item.type);
                         if (!appearance) {
-                            const levelZone = snapToNearestLevelY(item.y);
-                            appearance = exportAppearanceForLevel(levelZone.id);
+                            let levelZone = exportZones[0] || null;
+                            let minDiff = Infinity;
+                            exportZones.forEach(zone => {
+                                const diff = Math.abs(item.y - zone.centerY);
+                                if (diff < minDiff) {
+                                    minDiff = diff;
+                                    levelZone = zone;
+                                }
+                            });
+                            appearance = levelZone ? exportAppearanceForLevel(levelZone.id) : null;
                         }
                         if (appearance) {
                             bgFill = appearance.bgFill;
