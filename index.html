@@ -3256,10 +3256,14 @@
             };
         }
 
-        // Level pita untuk satu node. Tipe yang dikenal menang; selain itu pita terdekat dari y.
+        // Pita PDF mengikuti posisi di layar, bukan field type.
+        // Kartu CEO tersimpan sebagai type bod, tetapi y-nya ada di pita CEO.
         function shareLevelId(node) {
-            if (node && LEVEL_ZONES.some(zone => zone.id === node.type)) return node.type;
-            return snapToNearestLevelY(Number(node && node.y) || 0).id;
+            const y = Number(node && node.y);
+            const mid = (Number.isFinite(y) ? y : 0) + 32;
+            const containing = LEVEL_ZONES.find(zone => mid >= zone.top && mid < zone.top + zone.height);
+            if (containing) return containing.id;
+            return snapToNearestLevelY(Number.isFinite(y) ? y : 0).id;
         }
 
         // Salinan untuk unduhan PDF (berkas yang dibagikan ke staf).
