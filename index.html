@@ -429,8 +429,8 @@
                 <button id="addNodeBtn" title="Tambah Personil Baru" class="edit-only px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                     <svg class="w-3.5 h-3.5 text-indigo-600 ic" aria-hidden="true"><use href="#i-user-plus"/></svg> Tambah Node
                 </button>
-                <button id="exportPngBtn" title="Unduh Gambar PNG" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-                    <svg class="w-3.5 h-3.5 ic" aria-hidden="true"><use href="#i-download"/></svg> Export PNG
+                <button id="exportPdfBtn" title="Unduh PDF" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                    <svg class="w-3.5 h-3.5 ic" aria-hidden="true"><use href="#i-download"/></svg> Export PDF
                 </button>
             </div>
         </div>
@@ -628,6 +628,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.86.2/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script>
         // LocalStorage Key (Version 14: bagan bawaan dikosongkan, cache lama tidak dibaca)
         const STORAGE_KEY = 'STK_ORG_CHART_DATA_V14';
@@ -3216,7 +3217,7 @@
             if (typeof cb === 'function') cb(!!renew);
         }
 
-        // Card paint for SVG/PNG export. Unknown types fall back to the nearest band.
+        // Card paint for the PDF export. Unknown types fall back to the nearest band.
         function exportAppearanceForLevel(levelId) {
             if (levelId === 'ceo') {
                 return {
@@ -3261,7 +3262,7 @@
             return snapToNearestLevelY(Number(node && node.y) || 0).id;
         }
 
-        // Salinan untuk unduhan Export PNG (berkas yang dibagikan ke staf).
+        // Salinan untuk unduhan PDF (berkas yang dibagikan ke staf).
         // Posisi kosong (type vacant) tidak ikut. Anaknya naik ke atasan terdekat yang masih ada,
         // lalu tata letak dirapatkan. Orang dengan penanda tetap ikut; titik penanda tidak digambar.
         // Bagan di layar dan data tersimpan tidak diubah.
@@ -3403,9 +3404,57 @@
             return { nodes: visible, zones: zones.length ? zones : LEVEL_ZONES };
         }
 
-        // High-Resolution Export
-        function exportChartToPng() {
+        function exportDateLabel(date) {
             try {
+                return new Intl.DateTimeFormat('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    timeZone: 'Asia/Jakarta'
+                }).format(date);
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function pdfConstructor() {
+            const lib = window.jspdf;
+            if (lib && typeof lib.jsPDF === 'function') return lib.jsPDF;
+            return null;
+        }
+
+        // Halaman mengikuti bentuk bagan. Sisi panjang dibatasi kira-kira A0 supaya tetap satu halaman.
+        function fitPdfPage(chartPxW, chartPxH) {
+            const margin = 32;
+            const header = 64;
+            const maxLong = 3370;
+            const maxShort = 2384;
+            let scale = 0.8;
+            let chartW = chartPxW * scale;
+            let chartH = chartPxH * scale;
+            let pageW = Math.max(460, chartW + margin * 2);
+            let pageH = chartH + margin * 2 + header;
+            const longSide = Math.max(pageW, pageH);
+            const shortSide = Math.min(pageW, pageH);
+            if (longSide > maxLong || shortSide > maxShort) {
+                const fit = Math.min(maxLong / longSide, maxShort / shortSide);
+                scale *= fit;
+                chartW = chartPxW * scale;
+                chartH = chartPxH * scale;
+                pageW = Math.max(460, chartW + margin * 2);
+                pageH = chartH + margin * 2 + header;
+            }
+            return { pageW: pageW, pageH: pageH, chartW: chartW, chartH: chartH, margin: margin, header: header };
+        }
+
+        // High-resolution PDF. Vacant seats are already removed by buildShareExport.
+        function exportChartToPdf() {
+            try {
+                const JsPDF = pdfConstructor();
+                if (!JsPDF) {
+                    showToast('Tidak dapat memuat pembuat PDF.');
+                    return;
+                }
                 const share = buildShareExport(orgData);
                 const exportNodes = share.nodes;
                 const exportZones = share.zones;
@@ -3522,39 +3571,70 @@
                 const encodedSvg = encodeURIComponent(svgString);
                 const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodedSvg;
                 const img = new Image();
+                const pageFit = fitPdfPage(exportWidth, exportHeight);
+                const dateLabel = exportDateLabel(new Date());
 
                 img.onload = function () {
+                    try {
+                    const maxEdge = 4096;
+                    let scale = 2;
+                    if (Math.max(exportWidth, exportHeight) * scale > maxEdge) {
+                        scale = Math.max(1, maxEdge / Math.max(exportWidth, exportHeight));
+                    }
                     const canvas = document.createElement('canvas');
-                    const scale = 2;
-                    canvas.width = exportWidth * scale;
-                    canvas.height = exportHeight * scale;
+                    canvas.width = Math.max(1, Math.round(exportWidth * scale));
+                    canvas.height = Math.max(1, Math.round(exportHeight * scale));
                     const ctx = canvas.getContext('2d');
                     ctx.scale(scale, scale);
-
                     ctx.drawImage(img, 0, 0);
 
-                    const pngUrl = canvas.toDataURL('image/png');
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = pngUrl;
-                    downloadLink.download = 'Struktur_Organisasi_PT_STK.png';
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
+                    const doc = new JsPDF({
+                        orientation: pageFit.pageW >= pageFit.pageH ? 'l' : 'p',
+                        unit: 'pt',
+                        format: [pageFit.pageW, pageFit.pageH]
+                    });
+                    const pageW = doc.internal.pageSize.getWidth();
+                    const pageH = doc.internal.pageSize.getHeight();
+                    doc.setFillColor(15, 23, 42);
+                    doc.rect(0, 0, pageW, pageFit.header, 'F');
+                    const title = 'Struktur Organisasi STK';
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(16);
+                    doc.setTextColor(255, 255, 255);
+                    const titleW = doc.getTextWidth(title);
+                    doc.text(title, pageFit.margin, 28);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(10);
+                    doc.setTextColor(203, 213, 225);
+                    const dateW = doc.getTextWidth(dateLabel);
+                    if (pageFit.margin + titleW + 28 + dateW <= pageW - pageFit.margin) {
+                        doc.text(dateLabel, pageW - pageFit.margin, 28, { align: 'right' });
+                    } else {
+                        doc.text(dateLabel, pageFit.margin, 48);
+                    }
+                    const availW = pageW - pageFit.margin * 2;
+                    const availH = pageH - pageFit.header - pageFit.margin * 2;
+                    const drawScale = Math.min(availW / exportWidth, availH / exportHeight);
+                    const drawW = exportWidth * drawScale;
+                    const drawH = exportHeight * drawScale;
+                    const chartX = pageFit.margin + (availW - drawW) / 2;
+                    const chartY = pageFit.header + pageFit.margin + Math.max(0, (availH - drawH) / 2);
+                    doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', chartX, chartY, drawW, drawH);
+                    doc.save('Struktur_Organisasi_STK.pdf');
+                    } catch (err) {
+                        console.log('pdf build error', err && err.stack || err);
+                        showToast('Terjadi kesalahan saat mengunduh PDF.');
+                    }
                 };
 
-                img.onerror = function() {
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = dataUrl;
-                    downloadLink.download = 'Struktur_Organisasi_PT_STK.svg';
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
+                img.onerror = function () {
+                    showToast('Terjadi kesalahan saat mengunduh PDF.');
                 };
 
                 img.src = dataUrl;
             } catch (err) {
-                console.error("Export PNG Error:", err);
-                showToast("Terjadi kesalahan saat mengunduh gambar.");
+                console.error('Export PDF Error:', err);
+                showToast('Terjadi kesalahan saat mengunduh PDF.');
             }
         }
 
@@ -3691,8 +3771,8 @@
             const cancelModalBtn = document.getElementById('cancelModalBtn');
             if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
 
-            const exportPngBtn = document.getElementById('exportPngBtn');
-            if (exportPngBtn) exportPngBtn.addEventListener('click', exportChartToPng);
+            const exportPdfBtn = document.getElementById('exportPdfBtn');
+            if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportChartToPdf);
 
             // Form Submit Listener & Auto-Capitalization On-The-Fly
             const nodeForm = document.getElementById('nodeForm');

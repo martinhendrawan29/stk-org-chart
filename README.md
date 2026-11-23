@@ -2,7 +2,7 @@
 
 Bagan struktur organisasi PT STK. Halaman statis (`index.html`) untuk GitHub Pages.
 
-Bagan dibaca dari Supabase (`org_chart_state`, id `stk`) setelah masuk. Tanpa sesi, halaman hanya menampilkan gerbang masuk. Akun yang masuk dapat melihat, mencari, menggeser, memperbesar, mengunduh PNG, dan mengubah bagan. Perubahan tersimpan ke cloud. Tidak ada akun khusus yang hanya boleh melihat.
+Bagan dibaca dari Supabase (`org_chart_state`, id `stk`) setelah masuk. Tanpa sesi, halaman hanya menampilkan gerbang masuk. Akun yang masuk dapat melihat, mencari, menggeser, memperbesar, mengunduh PDF, dan mengubah bagan. Perubahan tersimpan ke cloud. Tidak ada akun khusus yang hanya boleh melihat.
 
 ## Mencoba sinkronisasi
 
