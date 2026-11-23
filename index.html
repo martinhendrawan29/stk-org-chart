@@ -3264,8 +3264,8 @@
 
         // Salinan untuk unduhan PDF (berkas yang dibagikan ke staf).
         // Posisi kosong (type vacant) tidak ikut. Anaknya naik ke atasan terdekat yang masih ada,
-        // lalu tata letak dirapatkan. Orang dengan penanda tetap ikut; titik penanda tidak digambar.
-        // Bagan di layar dan data tersimpan tidak diubah.
+        // lalu tata letak dirapatkan. Orang dengan penanda tetap ikut; titik penanda dan nomor
+        // karyawan tidak digambar. Bagan di layar dan data tersimpan tidak diubah.
         function buildShareExport(source) {
             const all = Array.isArray(source) ? source.map(node => ({ ...node })) : [];
             const byId = new Map(all.map(node => [String(node.id), node]));
@@ -3492,6 +3492,7 @@
 
                 const pathsSvg = generateConnectorsSvgString(startX, startY, 'arrowExport', exportNodes);
 
+                // Nomor karyawan tetap di kartu layar. PDF tidak menampilkan lencana STK-xxx.
                 let nodesXml = '';
                 exportNodes.forEach(item => {
                     const nx = item.x - startX;
@@ -3501,7 +3502,6 @@
                     let strokeColor = "#cbd5e1";
                     let nameColor = "#1e293b";
                     let titleColor = "#64748b";
-                    let empColor = "#94a3b8";
                     let accentBar = "";
 
                     if (item.type === 'vacant') {
@@ -3526,7 +3526,6 @@
                             strokeColor = appearance.strokeColor;
                             nameColor = appearance.nameColor;
                             titleColor = appearance.titleColor;
-                            empColor = appearance.empColor;
                             if (appearance.accent) {
                                 accentBar = `<rect x="${nx}" y="${ny}" width="5" height="64" rx="2" fill="${appearance.accent}" />`;
                             }
@@ -3535,14 +3534,12 @@
 
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const safeTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const empLabel = empNoVisible(item);
 
                     nodesXml += `
                         <g>
                             <rect x="${nx}" y="${ny}" width="210" height="64" rx="8" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1.5" ${item.type === 'vacant' ? 'stroke-dasharray="6 4"' : ''} />
                             ${accentBar}
                             <text x="${nx + 105}" y="${ny + 28}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="700" fill="${nameColor}">${safeName}</text>
-                            ${empLabel ? `<text x="${nx + 200}" y="${ny + 16}" text-anchor="end" font-family="sans-serif" font-size="8" font-weight="600" fill="${empColor}">${empLabel}</text>` : ''}
                             <text x="${nx + 105}" y="${ny + 46}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="500" fill="${titleColor}">${safeTitle}</text>
                         </g>
                     `;
