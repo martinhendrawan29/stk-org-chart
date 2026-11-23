@@ -1,4 +1,4 @@
-const CACHE = 'stk-org-chart-shell-v8';
+const CACHE = 'stk-org-chart-shell-v9';
 
 function isSupabaseTraffic(url) {
   const host = url.hostname.toLowerCase();

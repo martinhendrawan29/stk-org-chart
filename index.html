@@ -120,6 +120,7 @@
         body.auth-locked #toast,
         body.auth-locked #nodeModal,
         body.auth-locked #confirmModal,
+        body.auth-locked #nameChangeModal,
         body.auth-locked #choiceModal {
             visibility: hidden !important;
         }
@@ -476,6 +477,7 @@
                         <input type="number" id="modalEmpNoOverride" min="1" step="1" inputmode="numeric" placeholder="Ubah (opsional)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                     </div>
                     <p id="modalEmpNoHint" class="mt-1 text-[10px] text-slate-400 leading-snug">Kosongkan untuk nomor otomatis. Nomor yang sudah terbit tidak dipakai ulang.</p>
+                    <p id="modalEmpNoError" class="mt-1 text-[10px] font-semibold text-red-600 leading-snug hidden" role="alert"></p>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Jabatan / Posisi</label>
@@ -511,6 +513,19 @@
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- KONFIRMASI PERGANTIAN NAMA -->
+    <div id="nameChangeModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="nameChangeTitle">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden p-6 text-center">
+            <h3 id="nameChangeTitle" class="font-bold text-slate-900 text-base mb-1">Nama berubah</h3>
+            <p id="nameChangeText" class="text-xs text-slate-600 mb-6 leading-relaxed">Nama berubah. Ini orang baru atau hanya koreksi penulisan nama?</p>
+            <div class="flex flex-col gap-2">
+                <button type="button" id="nameChangeNewBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition shadow w-full">Orang baru (nomor baru)</button>
+                <button type="button" id="nameChangeKeepBtn" class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition w-full">Koreksi nama (nomor tetap)</button>
+                <button type="button" id="nameChangeCancelBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition w-full">Batal</button>
+            </div>
         </div>
     </div>
 
@@ -946,11 +961,50 @@
                 .replace(/"/g, '&quot;');
         }
 
+        function personNameKey(value) {
+            return String(value == null ? '' : value).trim().toLowerCase();
+        }
+
+        // Nama berubah pada posisi yang sudah terisi dan sudah punya nomor.
+        // Override eksplisit adalah pilihan nomor, jadi dialog tidak ditampilkan.
+        function nameChangeNeedsConfirm(item, nextName, isVacant, overrideValue) {
+            if (!item || isVacant || isVacantNode(item)) return false;
+            if (overrideValue != null) return false;
+            if (parseEmpNo(item.emp_no) == null) return false;
+            return personNameKey(item.name) !== personNameKey(nextName);
+        }
+
+        // Nomor milik node ini hanya jika posisi sedang terisi. Posisi kosong tidak memegang nomor.
+        function ownCurrentEmpNo(selfId) {
+            if (!selfId) return null;
+            const item = orgData.find(d => d.id === selfId);
+            if (!item || isVacantNode(item)) return null;
+            return parseEmpNo(item.emp_no);
+        }
+
+        // Sudah pernah terbit (high-water), kecuali nomor yang memang sedang dipakai node ini.
+        function empNoPreviouslyIssued(n, selfId) {
+            const own = ownCurrentEmpNo(selfId);
+            if (own != null && n === own) return false;
+            return n <= highWater(orgData);
+        }
+
+        function assignFreshEmpNo(node) {
+            const provisional = serverLastEmpNo == null;
+            node.emp_no = allocateEmpNo();
+            if (provisional) provisionalEmpIds.add(node.id);
+            else provisionalEmpIds.delete(node.id);
+        }
+
         function applyEmpNoChoice(node, choice) {
             const isVacant = !!(choice && choice.isVacant);
             const override = choice ? choice.override : null;
             if (isVacant) {
+                // Nomor lama dipensiunkan: high-water tidak turun, lalu emp_no dilepas.
                 provisionalEmpIds.delete(node.id);
+                const retired = parseEmpNo(node.emp_no);
+                if (retired != null && retired > lastEmpNo) lastEmpNo = retired;
+                delete node.emp_no;
                 return;
             }
             if (override != null) {
@@ -959,14 +1013,18 @@
                 provisionalEmpIds.delete(node.id);
                 return;
             }
+            // Mengisi posisi yang tadinya kosong, atau orang baru di posisi yang sama,
+            // selalu menerbitkan nomor baru. Jangan mewarisi emp_no yang masih menempel.
+            if (choice && (choice.wasVacant || choice.renew)) {
+                assignFreshEmpNo(node);
+                return;
+            }
             if (parseEmpNo(node.emp_no) != null) {
                 provisionalEmpIds.delete(node.id);
                 return;
             }
-            if (choice && (choice.isNew || choice.wasVacant)) {
-                const provisional = serverLastEmpNo == null;
-                node.emp_no = allocateEmpNo();
-                if (provisional) provisionalEmpIds.add(node.id);
+            if (choice && choice.isNew) {
+                assignFreshEmpNo(node);
             }
         }
 
@@ -981,7 +1039,7 @@
         }
 
         function empNoTaken(n, selfId) {
-            return orgData.some(d => d.id !== selfId && parseEmpNo(d.emp_no) === n);
+            return orgData.some(d => d.id !== selfId && !isVacantNode(d) && parseEmpNo(d.emp_no) === n);
         }
 
         function decideInitialSync({
@@ -1277,6 +1335,7 @@
                 if (isConnectingMode) toggleConnectMode();
                 closeModal();
                 closeConfirmModal();
+                closeNameChangeDialog();
                 clearMultiSelection();
                 historyStack = [];
                 redoStack = [];
@@ -2839,9 +2898,33 @@
 
             const empOverride = document.getElementById('modalEmpNoOverride');
             if (empOverride) empOverride.value = '';
+            clearEmpNoError();
             syncVacantUi();
 
             modal.classList.remove('hidden');
+        }
+
+        function clearEmpNoError() {
+            const err = document.getElementById('modalEmpNoError');
+            const input = document.getElementById('modalEmpNoOverride');
+            if (err) {
+                err.textContent = '';
+                err.classList.add('hidden');
+            }
+            if (input) input.classList.remove('border-red-500');
+        }
+
+        function showEmpNoError(message) {
+            const err = document.getElementById('modalEmpNoError');
+            const input = document.getElementById('modalEmpNoOverride');
+            if (err) {
+                err.textContent = message;
+                err.classList.remove('hidden');
+            }
+            if (input) {
+                input.classList.add('border-red-500');
+                input.focus();
+            }
         }
 
         function updateEmpNoForm() {
@@ -2854,24 +2937,20 @@
             const id = document.getElementById('modalNodeId').value;
             const item = id ? orgData.find(d => d.id === id) : null;
             const existing = item ? parseEmpNo(item.emp_no) : null;
+            const fillingVacant = !!(item && isVacantNode(item));
             if (vacant) {
                 override.disabled = true;
-                if (existing) {
-                    badge.textContent = formatEmpNo(existing);
-                    hint.textContent = 'Tidak ditampilkan selama posisi kosong. Nomor tetap tersimpan dan tidak dipakai ulang.';
-                } else {
-                    badge.textContent = '—';
-                    hint.textContent = 'Posisi kosong tidak mendapat nomor karyawan.';
-                }
+                badge.textContent = '—';
+                hint.textContent = 'Posisi kosong tidak memakai nomor. Nomor lama dipensiunkan dan tidak dipakai ulang.';
                 return;
             }
             override.disabled = false;
-            if (existing) {
+            if (existing != null && !fillingVacant) {
                 badge.textContent = formatEmpNo(existing);
                 hint.textContent = 'Nomor ini tetap. Isi kolom di samping hanya jika perlu mengubahnya.';
                 return;
             }
-            const willAssign = !id || (item && isVacantNode(item));
+            const willAssign = !id || fillingVacant;
             if (!willAssign) {
                 badge.textContent = '—';
                 hint.textContent = 'Belum ada nomor. Isi kolom untuk menetapkan. Kosongkan agar tetap tanpa nomor.';
@@ -2925,6 +3004,26 @@
         // Simpan dari modal. Dipanggil oleh tombol Simpan dan tombol Enter.
         function saveNodeFromModal() {
             if (!canEdit()) return false;
+            if (nameChangeCallback) return false;
+            const fields = readNodeFormFields();
+            if (!fields) return false;
+
+            if (fields.id) {
+                const item = orgData.find(d => d.id === fields.id);
+                if (!item) { closeModal(); return false; }
+                if (fields.parent && (fields.parent === fields.id || isDescendant(fields.id, fields.parent))) {
+                    showToast('Atasan tidak valid: atasan tidak boleh bawahannya sendiri (akan membuat siklus).');
+                    return false;
+                }
+                if (nameChangeNeedsConfirm(item, fields.name, fields.isVacant, fields.override)) {
+                    showNameChangeDialog(renew => commitNodeSave(fields, renew));
+                    return false;
+                }
+            }
+            return commitNodeSave(fields, false);
+        }
+
+        function readNodeFormFields() {
             const titleSelectEl = document.getElementById('modalTitleSelect');
             const customTitleInputEl = document.getElementById('modalCustomTitleInput');
             const nameInputEl = document.getElementById('modalName');
@@ -2938,7 +3037,7 @@
                 if (!title) {
                     showToast('Silakan masukkan nama posisi baru.');
                     customTitleInputEl.focus();
-                    return false;
+                    return null;
                 }
             }
 
@@ -2949,7 +3048,7 @@
                 nameInputEl.classList.add('border-red-500');
                 showToast('Nama lengkap wajib diisi, atau centang Posisi Kosong (Vacant).');
                 nameInputEl.focus();
-                return false;
+                return null;
             }
 
             const selectedLevel = document.getElementById('modalTypeSelect').value;
@@ -2958,32 +3057,65 @@
             const targetY = getCenterYForLevel(selectedLevel);
             const override = readEmpNoOverride();
             if (!override.ok) {
+                clearEmpNoError();
                 showToast('Nomor karyawan harus bilangan bulat positif.');
                 const overrideInput = document.getElementById('modalEmpNoOverride');
                 if (overrideInput) overrideInput.focus();
-                return false;
+                return null;
             }
-            if (!isVacant && override.value != null && empNoTaken(override.value, id || null)) {
-                showToast('Nomor karyawan itu sudah dipakai.');
+            if (!isVacant && override.value != null) {
                 const overrideInput = document.getElementById('modalEmpNoOverride');
-                if (overrideInput) overrideInput.focus();
-                return false;
+                if (empNoTaken(override.value, id || null)) {
+                    clearEmpNoError();
+                    showToast('Nomor karyawan itu sudah dipakai.');
+                    if (overrideInput) overrideInput.focus();
+                    return null;
+                }
+                if (empNoPreviouslyIssued(override.value, id || null)) {
+                    showEmpNoError('Nomor ini sudah pernah dipakai. Nomor karyawan tidak boleh dipakai ulang.');
+                    return null;
+                }
             }
+            clearEmpNoError();
+
+            return {
+                id: id,
+                name: name,
+                title: title,
+                parent: parent,
+                type: type,
+                isVacant: isVacant,
+                targetY: targetY,
+                override: override.value
+            };
+        }
+
+        function commitNodeSave(fields, renew) {
+            const id = fields.id;
+            const name = fields.name;
+            const title = fields.title;
+            const parent = fields.parent;
+            const type = fields.type;
+            const isVacant = fields.isVacant;
+            const targetY = fields.targetY;
+            const overrideValue = fields.override;
 
             if (id) {
                 const item = orgData.find(d => d.id === id);
                 if (!item) { closeModal(); return false; }
-                if (parent && (parent === id || isDescendant(id, parent))) {
-                    showToast('Atasan tidak valid: atasan tidak boleh bawahannya sendiri (akan membuat siklus).');
-                    return false;
-                }
                 const wasVacant = isVacantNode(item);
                 saveStateToHistory();
                 item.name = name;
                 item.title = title;
                 item.parent = parent;
                 item.type = type;
-                applyEmpNoChoice(item, { isNew: false, wasVacant: wasVacant, isVacant: isVacant, override: override.value });
+                applyEmpNoChoice(item, {
+                    isNew: false,
+                    wasVacant: wasVacant,
+                    isVacant: isVacant,
+                    override: overrideValue,
+                    renew: !!renew && !wasVacant
+                });
                 if (item.y !== targetY) {
                     // pindah level: x dipertahankan kalau kosong, kalau tidak digeser ke slot kosong terdekat
                     item.y = targetY;
@@ -3002,7 +3134,7 @@
                     x: findFreeX(newId, targetY, visibleCenterX),
                     y: targetY
                 };
-                applyEmpNoChoice(node, { isNew: true, wasVacant: false, isVacant: isVacant, override: override.value });
+                applyEmpNoChoice(node, { isNew: true, wasVacant: false, isVacant: isVacant, override: overrideValue });
                 orgData.push(node);
             }
 
@@ -3015,6 +3147,30 @@
         function closeModal() {
             const modal = document.getElementById('nodeModal');
             if (modal) modal.classList.add('hidden');
+            closeNameChangeDialog();
+        }
+
+        let nameChangeCallback = null;
+
+        function showNameChangeDialog(onChoice) {
+            const modal = document.getElementById('nameChangeModal');
+            if (!modal) return;
+            nameChangeCallback = onChoice;
+            modal.classList.remove('hidden');
+            const primary = document.getElementById('nameChangeNewBtn');
+            if (primary) primary.focus();
+        }
+
+        function closeNameChangeDialog() {
+            const modal = document.getElementById('nameChangeModal');
+            if (modal) modal.classList.add('hidden');
+            nameChangeCallback = null;
+        }
+
+        function chooseNameChange(renew) {
+            const cb = nameChangeCallback;
+            closeNameChangeDialog();
+            if (typeof cb === 'function') cb(!!renew);
         }
 
         // Card paint for SVG/PNG export. Unknown types fall back to the nearest band.
@@ -3207,6 +3363,17 @@
 
             renderSwimlanes();
 
+            const nameChangeNewBtn = document.getElementById('nameChangeNewBtn');
+            if (nameChangeNewBtn) nameChangeNewBtn.addEventListener('click', () => chooseNameChange(true));
+            const nameChangeKeepBtn = document.getElementById('nameChangeKeepBtn');
+            if (nameChangeKeepBtn) nameChangeKeepBtn.addEventListener('click', () => chooseNameChange(false));
+            const nameChangeCancelBtn = document.getElementById('nameChangeCancelBtn');
+            if (nameChangeCancelBtn) nameChangeCancelBtn.addEventListener('click', () => {
+                closeNameChangeDialog();
+                const nameInput = document.getElementById('modalName');
+                if (nameInput) nameInput.focus();
+            });
+
             // Confirm Modal Listeners
             const cancelConfirmBtn = document.getElementById('cancelConfirmBtn');
             if (cancelConfirmBtn) cancelConfirmBtn.addEventListener('click', closeConfirmModal);
@@ -3345,6 +3512,11 @@
                 nameInputEl.addEventListener('input', (e) => {
                     titleCaseInput(e.target);
                 });
+            }
+
+            const empNoOverrideEl = document.getElementById('modalEmpNoOverride');
+            if (empNoOverrideEl) {
+                empNoOverrideEl.addEventListener('input', clearEmpNoError);
             }
 
             if (nodeForm) {
